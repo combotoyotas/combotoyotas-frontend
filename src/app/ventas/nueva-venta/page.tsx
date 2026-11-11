@@ -1,7 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { ventasApi } from '@/lib/ventasApi'
+import { boletaApi } from '@/lib/boletaApi'
+import { normalizeNumeros } from '@/utils/formatBoletaNumeros'
 import { rifaApi } from '@/lib/rifaApi'
 import { Rifa } from '@/types/rifa'
 import { Cliente, BoletaEnCarrito } from '@/types/ventas'
@@ -48,7 +51,16 @@ function SelectorRifa({ rifas, rifaSeleccionada, onRifaSeleccionada }: {
 }
 
 export default function VentasPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-slate-600">Cargando ventas…</div>}>
+      <VentasPageContent />
+    </Suspense>
+  )
+}
+
+function VentasPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [rifas, setRifas] = useState<Rifa[]>([])
   const [rifaSeleccionada, setRifaSeleccionada] = useState<Rifa | null>(null)
   const [loading, setLoading] = useState(true)
@@ -58,6 +70,7 @@ export default function VentasPage() {
   const [pasoActual, setPasoActual] = useState<'seleccionar-rifa' | 'seleccionar-boletas' | 'datos-cliente' | 'resumen'>('seleccionar-rifa')
   const [boletasSeleccionadas, setBoletasSeleccionadas] = useState<BoletaEnCarrito[]>([])
   const [mostrarReservas, setMostrarReservas] = useState(false)
+  const [prefillDesdeBoleta, setPrefillDesdeBoleta] = useState(false)
   const [cliente, setCliente] = useState<Cliente>({
     nombre: '',
     telefono: '',
@@ -226,6 +239,55 @@ export default function VentasPage() {
   useEffect(() => {
     cargarRifas()
   }, [])
+
+  useEffect(() => {
+    if (loading || prefillDesdeBoleta || rifas.length === 0) return
+
+    const rifaId = searchParams.get('rifa_id')
+    const boletaId = searchParams.get('boleta_id')
+    if (searchParams.get('auto') !== '1' || !rifaId || !boletaId) return
+
+    const rifa = rifas.find((r) => r.id === rifaId)
+    if (!rifa) {
+      setError('No se encontró el proyecto de la boleta')
+      setPrefillDesdeBoleta(true)
+      return
+    }
+
+    ;(async () => {
+      try {
+        setRifaSeleccionada(rifa)
+        setPasoActual('seleccionar-boletas')
+        const detail = await boletaApi.getBoletaById(boletaId)
+        const b = detail.data
+        const precio =
+          typeof rifa.precio_boleta === 'number'
+            ? rifa.precio_boleta
+            : parseFloat(String(rifa.precio_boleta || '0'))
+        const nums = normalizeNumeros(b.numeros, b.numero)
+        const block = await ventasApi.bloquearBoleta(boletaId, 15, b.numero)
+        const bloqueo = block.data
+        const enCarrito: BoletaEnCarrito = {
+          id: b.id,
+          numero: b.numero,
+          numeros: nums,
+          numero_principal: b.numero,
+          precio,
+          reserva_token: bloqueo.reserva_token,
+          bloqueo_hasta: bloqueo.bloqueo_hasta,
+          qr_url: b.qr_url,
+          barcode: b.barcode,
+          imagen_url: b.imagen_url ?? undefined,
+        }
+        setBoletasSeleccionadas([enCarrito])
+        setError(null)
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'No se pudo agregar la boleta al carrito de venta')
+      } finally {
+        setPrefillDesdeBoleta(true)
+      }
+    })()
+  }, [loading, prefillDesdeBoleta, rifas, searchParams])
 
   if (loading) {
     return (

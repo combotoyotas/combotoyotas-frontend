@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/config/api'
+import { TokenManager } from '@/utils/auth'
 import { 
   Rifa, 
   RifaCreateRequest, 
@@ -24,6 +25,17 @@ class RifaApiService {
     const data = await response.json()
     
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        const msg = String(data.message || '').toLowerCase()
+        if (
+          msg.includes('token') ||
+          msg.includes('authentication') ||
+          data.error === 'Forbidden' ||
+          data.error === 'Unauthorized'
+        ) {
+          TokenManager.handleAuthError()
+        }
+      }
       if (data.error === 'Validation Error' && data.details) {
         const validationErrors = data.details.map((detail: any) => 
           `${detail.field}: ${detail.message}`

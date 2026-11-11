@@ -80,53 +80,53 @@ export default function InstalarAppButton() {
 
   return (
     <>
-      <div className="mt-5 pt-5 border-t-[1.5px] border-black/15">
+      <div className="mt-5 pt-5 border-t border-slate-100">
         <button
           type="button"
           onClick={handleInstall}
           disabled={installing}
-          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-black text-[var(--primary)] border-[1.5px] border-black font-bold uppercase text-xs tracking-wider shadow-[3px_3px_0_#101010] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#101010] disabled:opacity-60 min-h-[44px]"
+          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-slate-900 text-white rounded-xl font-medium text-sm hover:bg-slate-800 disabled:opacity-60 min-h-[44px]"
         >
           <Download className="w-4 h-4 shrink-0" aria-hidden />
-          {installing ? 'Abriendo instalador…' : 'Instalar app'}
+          {installing ? 'Abriendo instalador…' : 'Instalar como app'}
         </button>
-        <p className="mt-2 text-[10px] text-center text-[var(--text-muted)] leading-relaxed">
+        <p className="mt-2 text-[11px] text-center text-slate-400 leading-relaxed">
           {isIos()
-            ? 'Acceso rápido desde la pantalla de inicio (Safari).'
+            ? 'Queda en tu pantalla de inicio, como una app nativa (Safari).'
             : deferredPrompt
-              ? 'Un toque y queda en tu celular como app.'
-              : 'Agrega el panel a la pantalla de inicio.'}
+              ? 'Un toque y se instala en tu celular.'
+              : 'Agrégala a la pantalla de inicio para usarla a pantalla completa.'}
         </p>
       </div>
 
       {guide && (
         <div
-          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-black/60"
+          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="pwa-guide-title"
           onClick={() => setGuide(null)}
         >
           <div
-            className="w-full max-w-sm bg-[var(--surface-elevated)] border-[1.5px] border-black shadow-[8px_8px_0_#101010] p-5 sm:p-6"
+            className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-slate-100 p-5 sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 border-[1.5px] border-black bg-[var(--primary)] text-black flex items-center justify-center shrink-0">
-                  <Smartphone className="w-4 h-4" aria-hidden />
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                  <Smartphone className="w-5 h-5" aria-hidden />
                 </div>
                 <div>
-                  <h2 id="pwa-guide-title" className="text-sm font-[800] uppercase tracking-tight">
+                  <h2 id="pwa-guide-title" className="text-sm font-semibold text-slate-900">
                     Instalar en {guide === 'ios' ? 'iPhone' : 'Android'}
                   </h2>
-                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Panel interno · Sueños Dorados</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Rifa Super Toyota</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setGuide(null)}
-                className="p-1.5 border-[1.5px] border-black hover:bg-black/5 shrink-0 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                className="p-1.5 rounded-lg hover:bg-slate-100 shrink-0 min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-500"
                 aria-label="Cerrar"
               >
                 <X className="w-4 h-4" />
@@ -134,64 +134,48 @@ export default function InstalarAppButton() {
             </div>
 
             {guide === 'ios' && !isIosSafari() && (
-              <p className="text-sm text-[var(--danger)] font-medium mb-4 border-[1.5px] border-black bg-[var(--danger-light)] px-3 py-2">
+              <p className="text-sm text-red-700 font-medium mb-4 rounded-xl bg-red-50 border border-red-100 px-3 py-2">
                 Abre esta página en <strong>Safari</strong> para poder instalar la app.
               </p>
             )}
 
-            <ol className="space-y-4 text-sm text-[var(--text-secondary)]">
+            <ol className="space-y-4 text-sm text-slate-600">
               {guide === 'ios' ? (
                 <>
                   <li className="flex gap-3">
-                    <span className="w-6 h-6 shrink-0 border-[1.5px] border-black bg-black text-[var(--primary)] text-xs font-bold flex items-center justify-center">
-                      1
-                    </span>
+                    <span className="w-6 h-6 shrink-0 rounded-full bg-indigo-600 text-white text-xs font-semibold flex items-center justify-center">1</span>
                     <span className="pt-0.5">
-                      Toca el botón <Share className="w-4 h-4 inline -mt-0.5 mx-0.5" aria-hidden />{' '}
-                      <strong>Compartir</strong> en la barra inferior de Safari.
+                      Toca <Share className="w-4 h-4 inline -mt-0.5 mx-0.5" aria-hidden /> <strong>Compartir</strong> en Safari.
                     </span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="w-6 h-6 shrink-0 border-[1.5px] border-black bg-black text-[var(--primary)] text-xs font-bold flex items-center justify-center">
-                      2
-                    </span>
+                    <span className="w-6 h-6 shrink-0 rounded-full bg-indigo-600 text-white text-xs font-semibold flex items-center justify-center">2</span>
                     <span className="pt-0.5">
-                      Elige <strong>「Agregar a pantalla de inicio」</strong>
+                      Elige <strong>Agregar a pantalla de inicio</strong>
                       <Plus className="w-4 h-4 inline -mt-0.5 mx-0.5" aria-hidden />.
                     </span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="w-6 h-6 shrink-0 border-[1.5px] border-black bg-black text-[var(--primary)] text-xs font-bold flex items-center justify-center">
-                      3
-                    </span>
+                    <span className="w-6 h-6 shrink-0 rounded-full bg-indigo-600 text-white text-xs font-semibold flex items-center justify-center">3</span>
                     <span className="pt-0.5">
-                      Toca <strong>「Agregar」</strong> arriba a la derecha. Listo.
+                      Toca <strong>Agregar</strong>. Listo: se abre a pantalla completa.
                     </span>
                   </li>
                 </>
               ) : (
                 <>
                   <li className="flex gap-3">
-                    <span className="w-6 h-6 shrink-0 border-[1.5px] border-black bg-black text-[var(--primary)] text-xs font-bold flex items-center justify-center">
-                      1
-                    </span>
+                    <span className="w-6 h-6 shrink-0 rounded-full bg-indigo-600 text-white text-xs font-semibold flex items-center justify-center">1</span>
+                    <span className="pt-0.5">Toca el menú <strong>⋮</strong> en Chrome.</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="w-6 h-6 shrink-0 rounded-full bg-indigo-600 text-white text-xs font-semibold flex items-center justify-center">2</span>
                     <span className="pt-0.5">
-                      Toca el menú <strong>⋮</strong> (tres puntos) arriba a la derecha en Chrome.
+                      Selecciona <strong>Instalar app</strong> o <strong>Agregar a pantalla de inicio</strong>.
                     </span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="w-6 h-6 shrink-0 border-[1.5px] border-black bg-black text-[var(--primary)] text-xs font-bold flex items-center justify-center">
-                      2
-                    </span>
-                    <span className="pt-0.5">
-                      Selecciona <strong>「Instalar app」</strong> o{' '}
-                      <strong>「Agregar a pantalla de inicio」</strong>.
-                    </span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="w-6 h-6 shrink-0 border-[1.5px] border-black bg-black text-[var(--primary)] text-xs font-bold flex items-center justify-center">
-                      3
-                    </span>
+                    <span className="w-6 h-6 shrink-0 rounded-full bg-indigo-600 text-white text-xs font-semibold flex items-center justify-center">3</span>
                     <span className="pt-0.5">Confirma y la app quedará en tu pantalla de inicio.</span>
                   </li>
                 </>
@@ -201,7 +185,7 @@ export default function InstalarAppButton() {
             <button
               type="button"
               onClick={() => setGuide(null)}
-              className="mt-6 w-full py-2.5 bg-[var(--primary)] text-black border-[1.5px] border-black font-bold uppercase text-xs tracking-wider shadow-[3px_3px_0_#101010]"
+              className="mt-6 w-full py-2.5 bg-indigo-600 text-white rounded-xl font-medium text-sm hover:bg-indigo-700 min-h-[44px]"
             >
               Entendido
             </button>

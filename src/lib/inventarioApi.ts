@@ -8,6 +8,7 @@ export interface InventarioVendedorResumen {
   email: string
   rol: string
   activo: boolean
+  max_boletas_inventario: number | null
   asignadas_total: number
   asignadas_libres: number
   asignadas_bloqueadas: number
@@ -75,6 +76,11 @@ export interface InventarioDetalle {
   boletas: InventarioBoleta[]
 }
 
+export interface AsignacionSerieItem {
+  serie: number
+  cantidad: number
+}
+
 export interface AsignarPayload {
   vendedor_id: string
   serie?: number | null
@@ -82,14 +88,32 @@ export interface AsignarPayload {
   hasta?: number | null
   cantidad?: number | null
   numeros?: number[]
+  asignaciones_series?: AsignacionSerieItem[]
   notas?: string | null
+}
+
+export interface AsignarPachaResumen {
+  boleta_id: string
+  numeros: number[]
+  par: string
+}
+
+export interface AsignacionSerieResumen {
+  serie: number
+  pedidas: number
+  asignadas: number
 }
 
 export interface AsignarResultado {
   modo: string
+  serie?: number | null
   vendedor: { id: string; nombre: string }
+  pedidas: number
   asignadas: number
+  omitidas: number
   boleta_ids: string[]
+  pachas: AsignarPachaResumen[]
+  por_serie?: AsignacionSerieResumen[]
 }
 
 export interface QuitarPayload {
@@ -103,6 +127,29 @@ export interface QuitarResultado {
   modo: string
   liberadas: number
   boleta_ids: string[]
+}
+
+export interface VerificacionNumeroItem {
+  numero_solicitado: number
+  boleta_id: string | null
+  codigo: string
+  mensaje: string
+  asignable?: boolean
+  liberable?: boolean
+  par?: string
+  inventario_de?: string | null
+  estado?: string | null
+}
+
+export interface VerificacionNumerosResult {
+  context: 'ASIGNAR' | 'QUITAR'
+  items: VerificacionNumeroItem[]
+  resumen: {
+    total: number
+    asignables?: number
+    liberables?: number
+    bloqueados: number
+  }
 }
 
 export type SolicitudBoletaResultado =
@@ -211,6 +258,26 @@ class InventarioApi {
     return this.handle<SolicitudBoletaResponse>(res)
   }
 
+  async verificarNumeros(
+    rifaId: string,
+    payload: {
+      numeros: number[]
+      context: 'ASIGNAR' | 'QUITAR'
+      vendedor_id?: string | null
+    }
+  ): Promise<VerificacionNumerosResult> {
+    const res = await this.fetchWithTimeout(
+      `${BASE}/rifa/${rifaId}/verificar-numeros`,
+      {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(payload),
+      },
+      45000
+    )
+    return this.handle<VerificacionNumerosResult>(res)
+  }
+
   async asignar(rifaId: string, payload: AsignarPayload): Promise<AsignarResultado> {
     const res = await this.fetchWithTimeout(
       `${BASE}/rifa/${rifaId}/asignar`,
@@ -270,6 +337,18 @@ class InventarioApi {
       method: 'PATCH',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ activo, forzar }),
+    })
+    return this.handle(res)
+  }
+
+  async actualizarTopeVendedor(
+    vendedorId: string,
+    max_boletas_inventario: number | null
+  ): Promise<{ id: string; nombre: string; max_boletas_inventario: number | null }> {
+    const res = await this.fetchWithTimeout(`${BASE}/vendedor/${vendedorId}/tope`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ max_boletas_inventario }),
     })
     return this.handle(res)
   }

@@ -38,6 +38,12 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     roles: ['SUPER_ADMIN', 'ADMIN', 'VENDEDOR'],
   },
   {
+    href: '/ajustes',
+    label: 'Ajustes',
+    description: 'Medios de pago y líneas de venta',
+    roles: ['SUPER_ADMIN', 'VENDEDOR'],
+  },
+  {
     href: '/ventas-publicas',
     label: 'Ventas públicas',
     description: 'Confirmar pagos online',
@@ -68,25 +74,19 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     roles: ['SUPER_ADMIN', 'ADMIN', 'VENDEDOR'],
   },
   {
-    href: '/solicitud-boletas',
-    label: 'Solicitud de boletas',
-    description: 'Pide una boleta para tu inventario',
-    roles: ['VENDEDOR'],
-  },
-  {
     href: '/ganadores',
     label: 'Ganadores',
     description: 'Asignar boletas ganadoras',
     roles: ['SUPER_ADMIN'],
   },
+  {
+    href: '/clientes-pasados',
+    label: 'Clientes pasados',
+    description: 'Reactivar clientes de proyectos anteriores',
+    roles: ['SUPER_ADMIN', 'ADMIN', 'VENDEDOR'],
+  },
   // Ocultos del menú (rutas siguen existiendo):
   // /seguimiento-clientes, /preasignaciones
-  {
-    href: '/gastos',
-    label: 'Gastos',
-    description: 'Reportar y ver gastos del equipo',
-    roles: ['SUPER_ADMIN', 'ADMIN'],
-  },
   {
     href: '/rifas',
     label: 'Proyectos',
@@ -97,13 +97,19 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     href: '/vendedores',
     label: 'Equipo',
     description: 'Admins, vendedores y altas',
-    roles: ['SUPER_ADMIN'],
+    roles: ['SUPER_ADMIN', 'ADMIN'],
   },
   {
     href: '/inventario-vendedores',
     label: 'Inventario vendedores',
     description: 'Boletas asignadas a cada vendedor',
     roles: ['SUPER_ADMIN', 'ADMIN'],
+  },
+  {
+    href: '/trueques',
+    label: 'Trueques',
+    description: 'Intercambiar o enviar boletas entre oficina y vendedores',
+    roles: ['SUPER_ADMIN'],
   },
   {
     href: '/historial',
@@ -117,19 +123,10 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     description: 'Vista avanzada de ventas',
     roles: ['SUPER_ADMIN'],
   },
-  {
-    href: '/transacciones-wompi',
-    label: 'Transacciones Wompi',
-    description: 'Auditoría de pagos y entrega',
-    roles: ['SUPER_ADMIN'],
-  },
 ]
 
-export function homeRouteForRole(rol?: string | null): string {
-  const role = (rol || '').toUpperCase()
-  if (role === 'SUPER_ADMIN') return '/analytics'
-  if (['ADMIN', 'VENDEDOR'].includes(role)) return '/mis-reportes'
-  return '/login'
+export function homeRouteForRole(_rol?: string | null): string {
+  return '/dashboard'
 }
 
 export function navItemsForRole(rol?: string | null): AdminNavItem[] {

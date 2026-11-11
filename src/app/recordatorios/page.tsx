@@ -20,7 +20,8 @@ export default function RecordatoriosPage() {
   if (!ok) {
     return (
       <div className="px-4 py-16 flex justify-center">
-        <div className="border-[1.5px] border-black bg-[var(--surface-elevated)] px-5 py-3 text-sm font-semibold uppercase tracking-wide shadow-[4px_4px_0_#101010]">
+        <div className="flex items-center gap-3 text-slate-500 text-sm">
+          <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
           Cargando...
         </div>
       </div>
@@ -29,12 +30,12 @@ export default function RecordatoriosPage() {
 
   return (
     <div className="px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-      <header className="mb-6 border-b-[1.5px] border-black pb-4">
-        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">Cobranza</p>
-        <h1 className="text-2xl sm:text-3xl font-[800] tracking-tight mt-1" style={{ fontFamily: 'var(--font-display)' }}>
+      <header className="mb-6 pb-4 border-b border-slate-200/80">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Cobranza</p>
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mt-1 text-slate-900">
           Recordatorios
         </h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">
+        <p className="text-sm text-slate-500 mt-1">
           Sigue pagos pendientes y contacta por WhatsApp.
         </p>
       </header>

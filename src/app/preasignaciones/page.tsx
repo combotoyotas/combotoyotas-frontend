@@ -11,7 +11,11 @@ import {
   preasignacionesApi,
   type Preasignacion,
   type AplicarResultado,
+  type CuotasPreasignacion,
+  type ResumenPreasignSuper,
 } from '@/lib/preasignacionesApi'
+
+const SOLO_INVENTARIO_ID = '__solo_inventario__'
 
 type ConfirmState = {
   title: string
@@ -40,16 +44,19 @@ function formatFecha(iso: string | null) {
 function agruparPorCliente(items: Preasignacion[]): ClienteGrupo[] {
   const mapa = new Map<string, ClienteGrupo>()
   for (const item of items) {
-    if (!mapa.has(item.cliente_id)) {
-      mapa.set(item.cliente_id, {
-        clienteId: item.cliente_id,
-        clienteNombre: item.cliente_nombre,
-        clienteIdentificacion: item.cliente_identificacion,
-        clienteTelefono: item.cliente_telefono,
+    const grupoId = item.cliente_id ?? SOLO_INVENTARIO_ID
+    if (!mapa.has(grupoId)) {
+      mapa.set(grupoId, {
+        clienteId: grupoId,
+        clienteNombre: item.cliente_id
+          ? item.cliente_nombre || 'Cliente'
+          : 'Solo número (mi inventario)',
+        clienteIdentificacion: item.cliente_id ? item.cliente_identificacion : null,
+        clienteTelefono: item.cliente_id ? item.cliente_telefono : null,
         numeros: [],
       })
     }
-    mapa.get(item.cliente_id)!.numeros.push(item)
+    mapa.get(grupoId)!.numeros.push(item)
   }
   for (const grupo of mapa.values()) {
     grupo.numeros.sort((a, b) => a.numero_boleta - b.numero_boleta)
@@ -82,8 +89,13 @@ export default function PreasignacionesPage() {
   const [cargandoRifas, setCargandoRifas] = useState(false)
   const [aplicando, setAplicando] = useState(false)
   const [resultadoAplicar, setResultadoAplicar] = useState<AplicarResultado | null>(null)
+  const [cuotas, setCuotas] = useState<CuotasPreasignacion | null>(null)
+  const [soloNumeroInput, setSoloNumeroInput] = useState('')
+  const [resumenSuper, setResumenSuper] = useState<ResumenPreasignSuper | null>(null)
 
   const esSuperAdmin = user?.rol?.toUpperCase() === 'SUPER_ADMIN'
+  const esVendedor = user?.rol?.toUpperCase() === 'VENDEDOR'
+  const esAdmin = user?.rol?.toUpperCase() === 'ADMIN'
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -100,21 +112,44 @@ export default function PreasignacionesPage() {
   }, [router])
 
   const cargar = useCallback(async () => {
+    if (!user) return
     setLoading(true); setError('')
     try {
-      const data = await preasignacionesApi.listar()
+      const rol = user.rol?.toUpperCase()
+      const [data, cuotasData] = await Promise.all([
+        preasignacionesApi.listar(),
+        preasignacionesApi.cuotas(),
+      ])
       setItems(data)
+      setCuotas(cuotasData)
+      if (rol === 'SUPER_ADMIN') {
+        const resumenData = await preasignacionesApi.resumenSuper()
+        setResumenSuper(resumenData)
+      } else {
+        setResumenSuper(null)
+      }
     } catch (e: any) {
       setError(e.message || 'Error al cargar las preasignaciones')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [user])
 
   useEffect(() => {
     if (!user) return
     cargar()
   }, [user, cargar])
+
+  useEffect(() => {
+    if (!esSuperAdmin) return
+    const timer = setTimeout(() => {
+      preasignacionesApi
+        .resumenSuper(q.trim() || undefined)
+        .then(setResumenSuper)
+        .catch(() => setResumenSuper(null))
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [q, esSuperAdmin])
 
   const gruposExistentes = useMemo(() => agruparPorCliente(items), [items])
 
@@ -155,7 +190,32 @@ export default function PreasignacionesPage() {
     setQ('')
   }
 
+  const agregarSoloNumero = async (valorRaw?: string) => {
+    const valor = (valorRaw ?? soloNumeroInput).trim()
+    const numero = Number(valor)
+    setError(''); setAviso('')
+    if (!valor || !Number.isInteger(numero) || numero < 0 || numero > 9999) {
+      setError('Escribe un número de boleta válido (0 a 9999).')
+      return
+    }
+    setProcesando('solo-numero')
+    try {
+      await preasignacionesApi.crear({ numero_boleta: numero })
+      setSoloNumeroInput('')
+      setAviso(`Boleta #${formatNumero(numero)} reservada para tu inventario.`)
+      await cargar()
+    } catch (e: any) {
+      setError(e.message || 'Error al preasignar el número')
+    } finally {
+      setProcesando(null)
+    }
+  }
+
   const agregarNumero = async (clienteId: string) => {
+    if (clienteId === SOLO_INVENTARIO_ID) {
+      await agregarSoloNumero(nuevoNumeroPorCliente[clienteId] || '')
+      return
+    }
     const valor = (nuevoNumeroPorCliente[clienteId] || '').trim()
     const numero = Number(valor)
     setError(''); setAviso('')
@@ -274,29 +334,30 @@ export default function PreasignacionesPage() {
   return (
     <div className="min-h-screen">
       <div className="px-3 sm:px-6 lg:px-8 py-4 sm:py-6 max-w-5xl">
-      <header className="mb-6 border-b-[1.5px] border-black pb-4">
+      <header className="mb-6 border-b border-slate-200 pb-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">Operación</p>
-            <h1 className="text-2xl font-[800] tracking-tight mt-1" style={{ fontFamily: 'var(--font-display)' }}>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Operación</p>
+            <h1 className="text-2xl font-semibold tracking-tight mt-1 text-slate-900">
               Boletas preasignadas
             </h1>
-            <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-xl">
-              Asigna números favoritos de un cliente y aplícalos en el próximo proyecto.
+            <p className="text-xs text-slate-500 mt-1 max-w-xl">
+              Guarda números favoritos por cliente o, si eres vendedor, solo el número para tu inventario.
+              Al aplicar a un proyecto nuevo, las tuyas pasan a tu inventario y, si hay cliente, quedan reservadas.
             </p>
           </div>
           <div className="flex items-center gap-2">
             {esSuperAdmin && (
               <button
                 onClick={abrirAplicar}
-                className="px-4 py-2.5 bg-[var(--primary)] text-black border-[1.5px] border-black font-bold uppercase text-xs tracking-wider shadow-[3px_3px_0_#101010]"
+                className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-medium text-sm shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 min-h-[44px]"
               >
                 Asignar al nuevo proyecto
               </button>
             )}
             <button
               onClick={() => setShowBuscarCliente(true)}
-              className="px-4 py-2.5 bg-black text-[var(--primary)] border-[1.5px] border-black font-bold uppercase text-xs tracking-wider"
+              className="px-4 py-2.5 bg-slate-900 text-white rounded-xl font-medium text-sm hover:bg-slate-800 min-h-[44px]"
             >
               + Buscar cliente
             </button>
@@ -305,7 +366,124 @@ export default function PreasignacionesPage() {
       </header>
 
       <main>
-        <div className="bg-[var(--surface-elevated)] border-[1.5px] border-black p-5 mb-6 shadow-[4px_4px_0_#101010]">
+        {esAdmin && (
+          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            Como administrador solo ves y gestionas preasignaciones hechas por admins, y solo
+            puedes asignar números a clientes creados por un administrador o super administrador.
+          </div>
+        )}
+
+        {cuotas?.aplica && (
+          <div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50/80 px-4 py-3 text-sm text-indigo-900 space-y-2">
+            {!cuotas.configurado ? (
+              <p className="font-medium text-amber-800">
+                Tu tope de inventario no está configurado. Pide al administrador que lo defina en
+                Inventario de vendedores (define también tus límites de preasignación).
+              </p>
+            ) : (
+              <>
+                <p className="font-medium">
+                  Tope inventario: {cuotas.max_inventario} boletas · Preasignación total:{' '}
+                  {cuotas.total ?? 0}/{cuotas.max_total} (10% por serie = {cuotas.max_por_serie} máx.
+                  en cada serie 0–9).
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((s) => (
+                    <span
+                      key={s}
+                      className="inline-flex items-center gap-1 rounded-md bg-white/80 border border-indigo-100 px-2 py-0.5 text-xs font-mono"
+                    >
+                      S{s}: {cuotas.por_serie?.[s] ?? 0}/{cuotas.cupo_por_serie?.[s] ?? 0}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {esSuperAdmin && resumenSuper && (
+          <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-slate-900 mb-3">
+              Resumen preasignaciones ({resumenSuper.total_registros} números)
+            </h2>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  Vendedores
+                </p>
+                {resumenSuper.vendedores.length === 0 ? (
+                  <p className="text-xs text-slate-400">Ninguno</p>
+                ) : (
+                  <ul className="space-y-2 text-sm">
+                    {resumenSuper.vendedores.map((r) => (
+                      <li key={r.creado_por} className="flex justify-between gap-2 border-b border-slate-50 pb-1">
+                        <span className="font-medium truncate">{r.nombre}</span>
+                        <span className="tabular-nums shrink-0">
+                          {r.total_preasignadas}
+                          {r.max_inventario != null && (
+                            <span className="text-slate-400 text-xs ml-1">(tope inv. {r.max_inventario})</span>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  Administradores
+                </p>
+                {resumenSuper.admins.length === 0 ? (
+                  <p className="text-xs text-slate-400">Ninguno</p>
+                ) : (
+                  <ul className="space-y-2 text-sm">
+                    {resumenSuper.admins.map((r) => (
+                      <li key={r.creado_por} className="flex justify-between gap-2 border-b border-slate-50 pb-1">
+                        <span className="font-medium truncate">{r.nombre}</span>
+                        <span className="tabular-nums shrink-0">{r.total_preasignadas}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 mt-3">
+              Usa el filtro de abajo para buscar por número de boleta o nombre de cliente.
+            </p>
+          </div>
+        )}
+
+        {esVendedor && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-6 shadow-sm">
+            <p className="text-sm font-medium text-slate-800 mb-2">Preasignar solo número (sin cliente)</p>
+            <p className="text-xs text-slate-500 mb-3">
+              Al aplicar al proyecto, la boleta quedará en tu inventario disponible para vender.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                max={9999}
+                value={soloNumeroInput}
+                onChange={(e) => setSoloNumeroInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && agregarSoloNumero()}
+                placeholder="Ej. 1047"
+                className="w-40 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => agregarSoloNumero()}
+                disabled={procesando === 'solo-numero' || !soloNumeroInput.trim()}
+                className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 font-medium min-h-[44px]"
+              >
+                {procesando === 'solo-numero' ? 'Guardando…' : '+ Agregar a mi inventario'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-6 shadow-sm">
           <label className="block text-sm font-medium text-slate-700 mb-2">
             Filtrar por cliente o número ({totalNumeros} número{totalNumeros !== 1 ? 's' : ''} preasignado{totalNumeros !== 1 ? 's' : ''})
           </label>
@@ -424,7 +602,7 @@ export default function PreasignacionesPage() {
                         >
                           {procesando === grupo.clienteId ? 'Agregando...' : '+ Agregar boleta'}
                         </button>
-                        {grupo.numeros.length === 0 && (
+                        {grupo.numeros.length === 0 && grupo.clienteId !== SOLO_INVENTARIO_ID && (
                           <button
                             onClick={() => quitarClienteVacio(grupo.clienteId)}
                             className="text-xs text-slate-400 hover:text-slate-600 ml-auto"

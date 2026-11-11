@@ -10,6 +10,7 @@ const METHOD_CONFIG = {
   WOMPI: { label: 'Wompi', color: '#00BFA6', icon: '🌐', bgColor: 'bg-teal-50', textColor: 'text-teal-700', borderColor: 'border-teal-200' },
   PSE: { label: 'PSE', color: '#0077B6', icon: '🏧', bgColor: 'bg-sky-50', textColor: 'text-sky-700', borderColor: 'border-sky-200' },
   SIN_GATEWAY: { label: 'Sin método', color: '#94A3B8', icon: '❓', bgColor: 'bg-slate-50', textColor: 'text-slate-600', borderColor: 'border-slate-200' },
+  VENDEDORES: { label: 'Vendedores', color: '#0891B2', icon: '🤝', bgColor: 'bg-cyan-50', textColor: 'text-cyan-800', borderColor: 'border-cyan-200' },
 };
 
 function getMethodConfig(metodo) {
@@ -27,10 +28,10 @@ function MethodCard({ method, totalGeneral, isSelected, onSelect }) {
   return (
     <button
       onClick={() => onSelect(method.metodo)}
-      className={`text-left w-full border-[1.5px] border-black p-3 sm:p-5 transition-all duration-200 cursor-pointer min-w-0
+      className={`text-left w-full border border-slate-200 rounded-2xl p-3 sm:p-5 transition-all duration-200 cursor-pointer min-w-0
         ${isSelected
-          ? `${config.bgColor} shadow-[3px_3px_0_#101010]`
-          : 'bg-white hover:shadow-[3px_3px_0_#101010]'
+          ? `${config.bgColor} shadow-sm`
+          : 'bg-white hover:shadow-sm'
         }`}
     >
       {/* Header */}
@@ -80,11 +81,23 @@ function MethodCard({ method, totalGeneral, isSelected, onSelect }) {
   );
 }
 
-export default function MethodsChart({ methods, serieDiaria, fechaInicio, fechaFin }) {
+export default function MethodsChart({
+  methods,
+  methodsVendedores,
+  separados = false,
+  vendedoresLiquidaciones,
+  serieDiaria,
+  fechaInicio,
+  fechaFin,
+}) {
   const [selectedMethod, setSelectedMethod] = useState(null);
+  const [selectedVendedor, setSelectedVendedor] = useState(false);
   const hayFiltro = !!(fechaInicio && fechaFin);
 
-  if (!methods?.length) {
+  const tieneOficina = methods?.length > 0;
+  const tieneVendedores = methodsVendedores?.length > 0 && Number(methodsVendedores[0]?.total) > 0;
+
+  if (!tieneOficina && !tieneVendedores) {
     return hayFiltro ? (
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col items-center justify-center min-h-[200px] text-slate-400">
         <svg className="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -95,8 +108,11 @@ export default function MethodsChart({ methods, serieDiaria, fechaInicio, fechaF
     ) : null;
   }
 
-  const totalGeneral = methods.reduce((sum, m) => sum + Number(m.total), 0);
-  const totalTransacciones = methods.reduce((sum, m) => sum + Number(m.cantidad), 0);
+  const totalGeneral = (methods || []).reduce((sum, m) => sum + Number(m.total), 0);
+  const totalTransacciones = (methods || []).reduce((sum, m) => sum + Number(m.cantidad), 0);
+  const vendMethod = tieneVendedores ? methodsVendedores[0] : null;
+  const totalVendedores = vendMethod ? Number(vendMethod.total) : 0;
+  const txVendedores = vendMethod ? Number(vendMethod.cantidad) : 0;
 
   // Periodo label
   const periodoLabel = useMemo(() => {
@@ -106,32 +122,50 @@ export default function MethodsChart({ methods, serieDiaria, fechaInicio, fechaF
   }, [fechaInicio, fechaFin]);
 
   // Ordenar por monto descendente
-  const sortedMethods = [...methods].sort((a, b) => Number(b.total) - Number(a.total));
+  const sortedMethods = [...(methods || [])].sort((a, b) => Number(b.total) - Number(a.total));
 
-  // Método líder
+  // Método líder (solo oficina)
   const lider = sortedMethods[0];
   const liderConfig = getMethodConfig(lider?.metodo);
 
   const handleSelect = (metodo) => {
     setSelectedMethod(prev => prev === metodo ? null : metodo);
+    setSelectedVendedor(false);
+  };
+
+  const handleSelectVendedor = () => {
+    setSelectedVendedor((prev) => !prev);
+    setSelectedMethod(null);
   };
 
   return (
-    <div className="bg-white border-[1.5px] border-black p-4 sm:p-6 space-y-4 sm:space-y-5 min-w-0 overflow-hidden">
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 space-y-4 sm:space-y-5 min-w-0 overflow-hidden">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 min-w-0">
         <div className="min-w-0">
           <h2 className="text-base sm:text-lg font-semibold text-slate-900">Métodos de Pago</h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5 break-words">
-            {periodoLabel}
+            {separados ? 'Recaudo oficina (panel + web · registrado por admin)' : periodoLabel}
             {hayFiltro && <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 font-medium">Filtrado</span>}
           </p>
+          {separados && (
+            <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">{periodoLabel}</p>
+          )}
         </div>
         <div className="text-right">
           <p className="text-2xl font-bold text-slate-900">${totalGeneral.toLocaleString('es-CO')}</p>
-          <p className="text-xs text-slate-400">{totalTransacciones} transacciones</p>
+          <p className="text-xs text-slate-400">
+            {totalTransacciones} transacciones
+            {!tieneOficina && separados && tieneVendedores ? ' · oficina' : ''}
+          </p>
         </div>
       </div>
+
+      {separados && !tieneOficina && tieneVendedores && (
+        <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+          No hay abonos registrados por admin en este periodo. El cobro de oficina aparece abajo en canal vendedores.
+        </p>
+      )}
 
       {/* Resumen rápido - método líder */}
       {lider && (
@@ -154,48 +188,81 @@ export default function MethodsChart({ methods, serieDiaria, fechaInicio, fechaF
         </div>
       )}
 
-      {/* Grid de tarjetas de métodos */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {sortedMethods.map((m) => (
-          <MethodCard
-            key={m.metodo}
-            method={m}
-            totalGeneral={totalGeneral}
-            isSelected={selectedMethod === m.metodo}
-            onSelect={handleSelect}
-          />
-        ))}
-      </div>
+      {/* Grid de tarjetas de métodos (oficina) */}
+      {tieneOficina && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {sortedMethods.map((m) => (
+            <MethodCard
+              key={m.metodo}
+              method={m}
+              totalGeneral={totalGeneral}
+              isSelected={selectedMethod === m.metodo}
+              onSelect={handleSelect}
+            />
+          ))}
+        </div>
+      )}
 
-      {/* Barra de distribución compacta */}
-      <div>
-        <p className="text-xs text-slate-400 mb-2">Distribución de ingresos</p>
-        <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex">
-          {sortedMethods.map((m) => {
-            const config = getMethodConfig(m.metodo);
-            const pct = totalGeneral > 0 ? (Number(m.total) / totalGeneral) * 100 : 0;
-            return (
-              <div
-                key={m.metodo}
-                className="h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
-                style={{ width: `${pct}%`, backgroundColor: config.color }}
-                title={`${config.label}: ${pct.toFixed(1)}%`}
-              />
-            );
-          })}
+      {tieneOficina && (
+        <div>
+          <p className="text-xs text-slate-400 mb-2">Distribución oficina</p>
+          <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex">
+            {sortedMethods.map((m) => {
+              const config = getMethodConfig(m.metodo);
+              const pct = totalGeneral > 0 ? (Number(m.total) / totalGeneral) * 100 : 0;
+              return (
+                <div
+                  key={m.metodo}
+                  className="h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                  style={{ width: `${pct}%`, backgroundColor: config.color }}
+                  title={`${config.label}: ${pct.toFixed(1)}%`}
+                />
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap gap-3 mt-2">
+            {sortedMethods.map((m) => {
+              const config = getMethodConfig(m.metodo);
+              return (
+                <span key={m.metodo} className="flex items-center gap-1 text-xs text-slate-500">
+                  <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: config.color }} />
+                  {config.label}
+                </span>
+              );
+            })}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-3 mt-2">
-          {sortedMethods.map((m) => {
-            const config = getMethodConfig(m.metodo);
-            return (
-              <span key={m.metodo} className="flex items-center gap-1 text-xs text-slate-500">
-                <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: config.color }} />
-                {config.label}
-              </span>
-            );
-          })}
+      )}
+
+      {separados && tieneVendedores && (
+        <div className="border-t border-slate-200 pt-4 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800">Canal vendedores</h3>
+              <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
+                Abonos que registró el vendedor en calle (no Nequi/PSE de oficina)
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xl font-bold text-cyan-900">${totalVendedores.toLocaleString('es-CO')}</p>
+              <p className="text-xs text-slate-400">{txVendedores} transacciones</p>
+            </div>
+          </div>
+          <MethodCard
+            method={vendMethod}
+            totalGeneral={totalVendedores}
+            isSelected={selectedVendedor}
+            onSelect={() => handleSelectVendedor()}
+          />
+          {selectedVendedor && vendedoresLiquidaciones != null && Number(vendedoresLiquidaciones) >= 0 && (
+            <p className="text-[10px] sm:text-xs text-cyan-800/90 bg-cyan-50 border border-cyan-100 rounded-lg px-3 py-2">
+              Liquidaciones registradas al panel:{' '}
+              <strong>${Number(vendedoresLiquidaciones).toLocaleString('es-CO')}</strong>
+              {' '}· entra al recaudo global cuando se registra la entrega
+            </p>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

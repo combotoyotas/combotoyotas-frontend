@@ -10,40 +10,40 @@ export default function VentasHomePage() {
     <div className="px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
       <PageHeader
         eyebrow="Ventas"
-        title="Operación de ventas"
-        description="Elige si quieres registrar una venta nueva o cobrar abonos pendientes."
+        title="¿Qué deseas hacer?"
+        description="Selecciona una opción para continuar"
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
         <button
           type="button"
           onClick={() => router.push('/ventas/nueva-venta')}
-          className="text-left bg-[var(--surface-elevated)] border-[1.5px] border-black p-6 shadow-[4px_4px_0_#101010] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[3px_3px_0_#101010] transition-all"
+          className="text-left bg-white border border-slate-200 rounded-2xl p-8 hover:shadow-md card-hover"
         >
-          <div className="w-11 h-11 border-[1.5px] border-black bg-[var(--primary)] text-black flex items-center justify-center mb-4 font-bold">
-            +
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 mb-4">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
           </div>
-          <h3 className="text-lg font-bold uppercase tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
-            Nueva venta
-          </h3>
-          <p className="text-sm text-[var(--text-secondary)] mt-2">
-            Registrar boletas para un cliente (bloqueo en tiempo real).
+          <h3 className="text-lg font-semibold text-slate-900">Nueva venta</h3>
+          <p className="text-slate-500 mt-2 text-sm">
+            Registrar una nueva venta de boletas para un cliente, con bloqueo en tiempo real.
           </p>
         </button>
 
         <button
           type="button"
           onClick={() => router.push('/ventas/gestionar')}
-          className="text-left bg-[var(--surface-elevated)] border-[1.5px] border-black p-6 shadow-[4px_4px_0_#101010] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[3px_3px_0_#101010] transition-all"
+          className="text-left bg-white border border-slate-200 rounded-2xl p-8 hover:shadow-md card-hover"
         >
-          <div className="w-11 h-11 border-[1.5px] border-black bg-black text-[var(--primary)] flex items-center justify-center mb-4 font-bold">
-            $
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 mb-4">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a5 5 0 00-10 0v2M5 13h14l-1.5 8h-11L5 13z" />
+            </svg>
           </div>
-          <h3 className="text-lg font-bold uppercase tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
-            Cobrar / abonar
-          </h3>
-          <p className="text-sm text-[var(--text-secondary)] mt-2">
-            Buscar por número o cliente y registrar pagos pendientes.
+          <h3 className="text-lg font-semibold text-slate-900">Cobrar venta pendiente</h3>
+          <p className="text-slate-500 mt-2 text-sm">
+            Registrar pagos o abonos a ventas existentes por número o cliente.
           </p>
         </button>
       </div>

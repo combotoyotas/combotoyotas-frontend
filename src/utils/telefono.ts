@@ -56,3 +56,15 @@ export function generarWhatsAppChatLink(telefono: string | undefined | null): st
   if (!tel || tel.length < 7) return null
   return `https://wa.me/${tel}`
 }
+
+/** Link wa.me con mensaje codificado (UTF-8) */
+export function generarWhatsAppLinkConMensaje(
+  telefono: string | undefined | null,
+  mensaje: string
+): string | null {
+  const tel = normalizarTelefono(telefono)
+  if (!tel || tel.length < 7) return null
+  const text = String(mensaje || '').trim()
+  if (!text) return generarWhatsAppChatLink(telefono)
+  return `https://wa.me/${tel}?text=${encodeURIComponent(text)}`
+}

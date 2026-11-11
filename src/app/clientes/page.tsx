@@ -21,6 +21,7 @@ export default function ClientesPage() {
   const [currentSearch, setCurrentSearch] = useState('')
   const [rifaActual, setRifaActual] = useState<{ id: string; nombre: string; estado: string } | null>(null)
   const [showVendedores, setShowVendedores] = useState(false)
+  const [showCreadoPor, setShowCreadoPor] = useState(false)
   const [resumenFiltros, setResumenFiltros] = useState<ClienteResumenFiltros>({
     todos: 0,
     con_boletas: 0,
@@ -46,8 +47,10 @@ export default function ClientesPage() {
       const u = JSON.parse(localStorage.getItem('user') || '{}')
       const rol = String(u.rol || '').toUpperCase()
       setShowVendedores(rol === 'SUPER_ADMIN' || rol === 'ADMIN')
+      setShowCreadoPor(rol === 'SUPER_ADMIN' || rol === 'ADMIN')
     } catch {
       setShowVendedores(false)
+      setShowCreadoPor(false)
     }
     fetchClientes()
   }, [router])
@@ -143,7 +146,8 @@ export default function ClientesPage() {
   if (loading && clientes.length === 0 && viewMode === 'list') {
     return (
       <div className="px-4 py-16 flex items-center justify-center">
-        <div className="border-[1.5px] border-black bg-[var(--surface-elevated)] px-5 py-3 text-sm font-semibold uppercase tracking-wide shadow-[4px_4px_0_#101010]">
+        <div className="flex items-center gap-3 text-slate-500 text-sm">
+          <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
           Cargando clientes...
         </div>
       </div>
@@ -161,18 +165,18 @@ export default function ClientesPage() {
 
   return (
     <div className="px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-      <header className="mb-6 border-b-[1.5px] border-black pb-4">
+      <header className="mb-6 pb-4 border-b border-slate-200/80">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">Directorio</p>
-            <h1 className="text-2xl sm:text-3xl font-[800] tracking-tight mt-1" style={{ fontFamily: 'var(--font-display)' }}>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Directorio</p>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mt-1 text-slate-900">
               {pageTitle}
             </h1>
           </div>
           {viewMode === 'list' && (
             <button
               onClick={handleCreateCliente}
-              className="bg-[var(--primary)] text-black border-[1.5px] border-black px-4 py-2 font-bold uppercase text-sm tracking-wide shadow-[3px_3px_0_#101010] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#101010]"
+              className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 min-h-[44px]"
             >
               + Nuevo cliente
             </button>
@@ -182,7 +186,7 @@ export default function ClientesPage() {
 
       <main>
         {error && (
-          <div className="bg-[var(--danger-light)] border-[1.5px] border-black text-[var(--danger)] px-4 py-3 mb-6 flex items-center justify-between">
+          <div className="bg-red-50 border border-red-100 text-red-700 rounded-xl px-4 py-3 mb-6 flex items-center justify-between">
             <span>{error}</span>
             <button onClick={() => setError(null)} className="font-bold">✕</button>
           </div>
@@ -218,6 +222,7 @@ export default function ClientesPage() {
             filtroActivo={filtroActivo}
             loading={loading}
             showVendedores={showVendedores}
+            showCreadoPor={showCreadoPor}
           />
         )}
       </main>

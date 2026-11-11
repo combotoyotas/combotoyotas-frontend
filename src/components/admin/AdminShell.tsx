@@ -112,7 +112,7 @@ export default function AdminShell({ children }: Props) {
               className="text-sm font-[800] uppercase tracking-tight truncate"
               style={{ fontFamily: 'var(--font-display)' }}
             >
-              Sueños Dorados
+              Rifa Super Toyota
             </p>
             <p className="text-[10px] text-[var(--primary)]/80 uppercase tracking-[0.12em] truncate">
               {roleLabel}
@@ -165,7 +165,7 @@ export default function AdminShell({ children }: Props) {
                 className="text-sm font-[800] uppercase tracking-tight truncate"
                 style={{ fontFamily: 'var(--font-display)' }}
               >
-                Sueños Dorados
+                Rifa Super Toyota
               </p>
               <p className="text-[10px] text-[var(--primary)]/80 uppercase tracking-[0.14em] truncate">
                 {roleLabel}

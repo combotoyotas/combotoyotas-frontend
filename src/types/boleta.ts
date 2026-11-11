@@ -47,6 +47,8 @@ export interface AbonoHistorial {
   fecha: string
   registrado_por?: string | null
   registrado_por_nombre?: string | null
+  registrado_por_rol?: string | null
+  linea_venta_nombre?: string | null
 }
 
 export interface BoletaDetail {

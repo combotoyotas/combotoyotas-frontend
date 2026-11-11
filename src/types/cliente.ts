@@ -1,5 +1,7 @@
 export interface Cliente {
   id: string
+  /** Código único de ficha (generado por el sistema; la cédula puede repetirse) */
+  codigo?: string
   nombre: string
   telefono: string
   email: string
@@ -15,6 +17,9 @@ export interface Cliente {
   deuda_total?: number
   /** Nombres de vendedores/admins con ventas a este cliente (admin/superadmin) */
   vendedores?: string[]
+  creado_por?: string | null
+  creado_por_etiqueta?: string | null
+  creado_por_rol?: string | null
 }
 
 export interface ClienteCreateRequest {

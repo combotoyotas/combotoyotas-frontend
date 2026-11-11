@@ -18,7 +18,7 @@ export default function BoletasPage() {
 
     try {
       const user = JSON.parse(userData)
-      setUserRole(user.rol)
+      setUserRole(String(user.rol || '').toUpperCase())
       
       // Check if user has allowed role
       if (user.rol !== 'SUPER_ADMIN' && user.rol !== 'ADMIN' && user.rol !== 'VENDEDOR') {
@@ -74,22 +74,46 @@ export default function BoletasPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Opción: Crear Boletas */}
+        <div className={`grid grid-cols-1 md:grid-cols-2 ${userRole === 'SUPER_ADMIN' ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-6`}>
+          {userRole === 'SUPER_ADMIN' && (
+            <div
+              className="bg-white rounded-lg shadow-sm border border-slate-200 p-8 hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => router.push('/boletas/crear')}
+            >
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-900 mb-2">Crear Boletas</h2>
+                  <p className="text-slate-600">Genera nuevas boletas para los proyectos disponibles</p>
+                </div>
+                <div className="text-blue-600 font-medium hover:text-blue-700">
+                  Ir a crear boletas →
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Opción: Cuadrícula */}
           <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-8 hover:shadow-md transition-shadow cursor-pointer"
-               onClick={() => router.push('/boletas/crear')}>
+               onClick={() => router.push('/boletas/cuadricula')}>
             <div className="flex flex-col items-center text-center space-y-4">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center">
+                <svg className="w-8 h-8 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
                 </svg>
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-slate-900 mb-2">Crear Boletas</h2>
-                <p className="text-slate-600">Genera nuevas boletas para los proyectos disponibles</p>
+                <h2 className="text-xl font-semibold text-slate-900 mb-2">Cuadrícula</h2>
+                <p className="text-slate-600 text-sm">
+                  Hoja de números: pool libre (admin) o tu inventario (vendedor)
+                </p>
               </div>
-              <div className="text-blue-600 font-medium hover:text-blue-700">
-                Ir a crear boletas →
+              <div className="text-violet-600 font-medium hover:text-violet-700">
+                Ver cuadrícula →
               </div>
             </div>
           </div>
@@ -117,16 +141,24 @@ export default function BoletasPage() {
         <div className="mt-12 bg-slate-50 rounded-lg border border-slate-200 p-6">
           <h3 className="text-lg font-medium text-slate-900 mb-3">Guía rápida</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            {userRole === 'SUPER_ADMIN' && (
+              <div className="flex items-start space-x-3">
+                <div className="w-2 h-2 bg-blue-600 rounded-full mt-1.5"></div>
+                <div>
+                  <strong>Crear Boletas:</strong> Solo super admin — genera boletas para proyectos activos
+                </div>
+              </div>
+            )}
             <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-blue-600 rounded-full mt-1.5"></div>
+              <div className="w-2 h-2 bg-violet-600 rounded-full mt-1.5"></div>
               <div>
-                <strong>Crear Boletas:</strong> Genera nuevas boletas para los proyectos activas
+                <strong>Cuadrícula:</strong> Hoja de números según tu rol (pool libre o inventario)
               </div>
             </div>
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-green-600 rounded-full mt-1.5"></div>
               <div>
-                <strong>Ver Boletas:</strong> Consulta el estado y detalles de todas las boletas
+                <strong>Ver Boletas:</strong> Consulta el estado y detalles de las boletas
               </div>
             </div>
           </div>

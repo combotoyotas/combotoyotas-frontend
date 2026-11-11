@@ -140,18 +140,18 @@ export default function GestionarAbonosPage() {
 
   return (
     <div className="px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-      <header className="mb-6 border-b-[1.5px] border-black pb-4">
+      <header className="mb-6 border-b border-slate-200 pb-4">
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={volverVentas}
-            className="border-[1.5px] border-black bg-[var(--surface-elevated)] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider hover:bg-[var(--primary)]"
+            className="border border-slate-200 bg-white px-3 py-2 rounded-xl text-sm text-slate-600 hover:bg-slate-50 min-h-[40px]"
           >
             ← Ventas
           </button>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">Cobranza</p>
-            <h1 className="text-2xl font-[800] tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Cobranza</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
               Gestionar abonos
             </h1>
           </div>
@@ -164,24 +164,24 @@ export default function GestionarAbonosPage() {
         {!clienteActivo && (
           <div className="space-y-4">
             {/* Tabs de búsqueda */}
-            <div className="bg-[var(--surface-elevated)] border-[1.5px] border-black shadow-[4px_4px_0_#101010] overflow-hidden">
-              <div className="flex border-b-[1.5px] border-black">
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+              <div className="flex border-b border-slate-200">
                 <button
                   onClick={() => { setModoBusqueda('boleta'); resetBusqueda() }}
-                  className={`flex-1 px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-colors min-h-[48px] ${
+                  className={`flex-1 px-3 sm:px-6 py-3 sm:py-4 text-sm font-medium transition-colors min-h-[48px] ${
                     modoBusqueda === 'boleta'
-                      ? 'bg-[var(--primary)] text-black'
-                      : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]'
+                      ? 'bg-indigo-600 text-white'
+                      : 'text-slate-500 hover:bg-slate-50'
                   }`}
                 >
                   Buscar por # del par
                 </button>
                 <button
                   onClick={() => { setModoBusqueda('cliente'); resetBusqueda() }}
-                  className={`flex-1 px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-colors border-l-[1.5px] border-black min-h-[48px] ${
+                  className={`flex-1 px-3 sm:px-6 py-3 sm:py-4 text-sm font-medium transition-colors border-l border-slate-200 min-h-[48px] ${
                     modoBusqueda === 'cliente'
-                      ? 'bg-[var(--primary)] text-black'
-                      : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]'
+                      ? 'bg-indigo-600 text-white'
+                      : 'text-slate-500 hover:bg-slate-50'
                   }`}
                 >
                   Buscar por cliente

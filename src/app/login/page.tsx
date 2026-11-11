@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { API_BASE_URL } from '@/config/api'
+import { TokenManager } from '@/utils/auth'
 import InstalarAppButton from '@/components/pwa/InstalarAppButton'
 
 interface LoginFormData {
@@ -35,10 +36,16 @@ const ROL_LABELS: Record<string, string> = {
   VENDEDOR: 'Vendedor',
 }
 
+const ROL_COLORS: Record<string, { bg: string; border: string; text: string; badge: string }> = {
+  SUPER_ADMIN: { bg: 'from-purple-700 to-indigo-900', border: 'border-purple-400', text: 'text-purple-100', badge: 'bg-purple-500/30 text-purple-100 border-purple-400' },
+  ADMIN:       { bg: 'from-indigo-700 to-slate-900',  border: 'border-indigo-400',  text: 'text-indigo-100',  badge: 'bg-indigo-500/30 text-indigo-100 border-indigo-400'  },
+  VENDEDOR:    { bg: 'from-emerald-700 to-teal-900',  border: 'border-emerald-400', text: 'text-emerald-100', badge: 'bg-emerald-500/30 text-emerald-100 border-emerald-400' },
+}
+
 export default function LoginPage() {
   const [formData, setFormData] = useState<LoginFormData>({
     email: '',
-    password: ''
+    password: '',
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -47,34 +54,39 @@ export default function LoginPage() {
   const router = useRouter()
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    const raw = localStorage.getItem('user')
-    if (!token || !raw) return
-    try {
-      const user = JSON.parse(raw)
-      const rol = (user?.rol || '').toUpperCase()
-      router.replace(rol === 'SUPER_ADMIN' ? '/analytics' : '/mis-reportes')
-    } catch {
-      /* stay on login */
+    let cancelled = false
+
+    const tryExistingSession = async () => {
+      const user = TokenManager.getUser()
+      if (!user) return
+
+      const ok = await TokenManager.validateSessionWithBackend(API_BASE_URL)
+      if (cancelled || !ok) return
+
+      router.replace('/dashboard')
+    }
+
+    void tryExistingSession()
+    return () => {
+      cancelled = true
     }
   }, [router])
 
   useEffect(() => {
     if (!welcomeUser) return
     if (countdown <= 0) {
-      const rol = (welcomeUser.rol || '').toUpperCase()
-      router.push(rol === 'SUPER_ADMIN' ? '/analytics' : '/mis-reportes')
+      router.push('/dashboard')
       return
     }
-    const t = setTimeout(() => setCountdown(c => c - 1), 1000)
+    const t = setTimeout(() => setCountdown((c) => c - 1), 1000)
     return () => clearTimeout(t)
   }, [welcomeUser, countdown, router])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }))
     setError(null)
   }
@@ -96,28 +108,24 @@ export default function LoginPage() {
       const data: LoginResponse = await response.json()
 
       if (data.success) {
-        localStorage.setItem('token', data.data!.token)
-        localStorage.setItem('user', JSON.stringify(data.data!.user))
+        TokenManager.saveAuthData(data.data!.token, data.data!.user)
         setWelcomeUser(data.data!.user)
         setCountdown(3)
+      } else if (data.error === 'Validation Error' && data.details) {
+        setError(data.details.map((detail) => detail.message).join(', '))
       } else {
-        if (data.error === 'Validation Error' && data.details) {
-          const validationErrors = data.details.map(detail => detail.message).join(', ')
-          setError(validationErrors)
-        } else {
-          setError(data.message || 'Error al iniciar sesión')
-        }
+        setError(data.message || 'Error al iniciar sesión')
       }
-    } catch (err) {
+    } catch {
       setError('Error de conexión. Por favor intenta nuevamente.')
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Pantalla de bienvenida post-login
   if (welcomeUser) {
-    const rol = (welcomeUser.rol || 'VENDEDOR').toUpperCase()
+    const rol = welcomeUser.rol || 'VENDEDOR'
+    const colors = ROL_COLORS[rol] || ROL_COLORS.ADMIN
     const rolLabel = ROL_LABELS[rol] || rol
     const iniciales = welcomeUser.nombre
       .split(' ')
@@ -127,29 +135,36 @@ export default function LoginPage() {
       .toUpperCase()
 
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--background)] p-4 sm:p-6">
-        <div className="w-full max-w-md border-[1.5px] border-black bg-[var(--surface-elevated)] shadow-[8px_8px_0_#101010] p-5 sm:p-8 text-center">
-          <div className="w-20 h-20 mx-auto border-[1.5px] border-black bg-black text-[var(--primary)] flex items-center justify-center text-2xl font-black mb-6">
-            {iniciales}
+      <div className={`min-h-screen min-h-dvh flex flex-col items-center justify-center bg-gradient-to-br ${colors.bg} p-6 relative overflow-hidden`}>
+        <div className="absolute inset-0 opacity-10 pointer-events-none">
+          <div className="absolute top-10 left-10 w-96 h-96 bg-white rounded-full blur-3xl" />
+          <div className="absolute bottom-10 right-10 w-80 h-80 bg-white rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative z-10 flex flex-col items-center gap-8 text-center max-w-lg w-full">
+          <div className={`w-36 h-36 rounded-full border-4 ${colors.border} bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-2xl`}>
+            <span className="text-5xl font-black text-white tracking-tight">{iniciales}</span>
           </div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--text-muted)] mb-2">Bienvenido</p>
-          <h1 className="text-3xl font-[800] tracking-tight mb-2" style={{ fontFamily: 'var(--font-display)' }}>
-            {welcomeUser.nombre}
-          </h1>
-          <span className="inline-block px-3 py-1 border-[1.5px] border-black bg-[var(--primary)] text-black text-[10px] font-bold uppercase tracking-widest">
-            {rolLabel}
-          </span>
-          <p className="mt-3 text-sm text-[var(--text-muted)]">{welcomeUser.email}</p>
-          <div className="mt-8 flex flex-col items-center gap-3">
-            <div className="w-14 h-14 border-[1.5px] border-black bg-black text-[var(--primary)] flex items-center justify-center text-2xl font-black">
-              {countdown}
+          <div>
+            <p className={`text-lg font-medium ${colors.text} opacity-80 mb-1 uppercase tracking-widest`}>
+              ¡Bienvenido de nuevo!
+            </p>
+            <h1 className="text-5xl font-black text-white leading-tight mb-3">
+              {welcomeUser.nombre.toUpperCase()}
+            </h1>
+            <span className={`inline-block px-5 py-1.5 rounded-full border text-sm font-bold uppercase tracking-widest ${colors.badge}`}>
+              {rolLabel}
+            </span>
+            <p className={`mt-3 text-sm ${colors.text} opacity-60`}>{welcomeUser.email}</p>
+          </div>
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-16 h-16 rounded-full border-4 border-white/30 flex items-center justify-center">
+              <span className="text-3xl font-black text-white">{countdown}</span>
             </div>
-            <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Entrando…</p>
+            <p className={`text-sm ${colors.text} opacity-70`}>Entrando al sistema...</p>
             <button
-              onClick={() => {
-                router.push(rol === 'SUPER_ADMIN' ? '/analytics' : '/mis-reportes')
-              }}
-              className="mt-2 px-6 py-2.5 bg-[var(--primary)] text-black border-[1.5px] border-black font-bold uppercase text-xs tracking-wider shadow-[3px_3px_0_#101010]"
+              onClick={() => router.push('/dashboard')}
+              className="mt-1 px-8 py-2.5 bg-white/20 hover:bg-white/30 border border-white/30 text-white font-semibold rounded-xl backdrop-blur-sm transition-all text-sm min-h-[44px]"
             >
               Entrar ahora →
             </button>
@@ -160,89 +175,120 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
-      <div className="hidden lg:flex lg:w-[46%] bg-black text-[var(--primary)] relative overflow-hidden border-r-[1.5px] border-black">
+    <div className="min-h-screen min-h-dvh flex">
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-indigo-600 via-indigo-700 to-slate-900 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl" />
+          <div className="absolute bottom-20 right-20 w-96 h-96 bg-indigo-300 rounded-full blur-3xl" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-400 rounded-full blur-2xl" />
+        </div>
         <div
-          className="absolute inset-0 opacity-20"
+          className="absolute inset-0 opacity-5"
           style={{
-            backgroundImage:
-              'linear-gradient(#c4f000 1px, transparent 1px), linear-gradient(90deg, #c4f000 1px, transparent 1px)',
-            backgroundSize: '32px 32px',
+            backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
+            backgroundSize: '40px 40px',
           }}
         />
-        <div className="relative z-10 flex flex-col justify-center px-14">
-          <div className="w-14 h-14 bg-[var(--primary)] text-black border border-[var(--primary)] flex items-center justify-center mb-8 font-[800] text-lg" style={{ fontFamily: 'var(--font-display)' }}>
-            RF
+        <div className="relative z-10 flex flex-col justify-center px-16 text-white">
+          <div className="mb-8">
+            <div className="w-14 h-14 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-6 border border-white/20">
+              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+              </svg>
+            </div>
+            <h2 className="text-4xl font-bold tracking-tight mb-3">Rifa Super Toyota</h2>
+            <p className="text-indigo-200 text-lg leading-relaxed max-w-md">
+              Plataforma profesional de gestión de rifas, ventas y sorteos en tiempo real.
+            </p>
           </div>
-          <h2 className="text-4xl font-[800] tracking-tight text-white mb-3" style={{ fontFamily: 'var(--font-display)' }}>
-            Sueños Dorados
-          </h2>
-          <p className="text-[var(--primary)]/80 text-base max-w-sm leading-relaxed">
-            Panel operativo para ventas, abonos y reportes. Misma interfaz para admin y vendedores.
-          </p>
-          <ul className="mt-10 space-y-3 text-sm text-white/70">
-            <li className="flex items-center gap-2"><span className="w-2 h-2 bg-[var(--primary)]" /> Ventas en tiempo real</li>
-            <li className="flex items-center gap-2"><span className="w-2 h-2 bg-[var(--primary)]" /> Abonos y cobranza</li>
-            <li className="flex items-center gap-2"><span className="w-2 h-2 bg-[var(--primary)]" /> Reportes por rol</li>
-          </ul>
+          <div className="space-y-4 mt-4">
+            {['Gestión de ventas en tiempo real', 'Control de boletas y abonos', 'Reportes y analítica avanzada'].map((item) => (
+              <div key={item} className="flex items-center gap-3 text-indigo-200">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <span className="text-sm">{item}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-[var(--background)]">
-        <div className="w-full max-w-[420px] min-w-0">
-          <div className="bg-[var(--surface-elevated)] border-[1.5px] border-black shadow-[8px_8px_0_#101010] p-5 sm:p-8">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-8 bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="w-full max-w-[420px] animate-fade-in">
+          <div className="lg:hidden text-center mb-8">
+            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+              </svg>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/60 p-8 sm:p-10 border border-slate-100">
             <div className="mb-8">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">Acceso</p>
-              <h1 className="text-2xl font-[800] tracking-tight mt-1" style={{ fontFamily: 'var(--font-display)' }}>
-                Iniciar sesión
-              </h1>
-              <p className="text-[var(--text-secondary)] text-sm mt-1">Admin, vendedores y super admin.</p>
+              <h1 className="text-2xl font-semibold text-slate-900 mb-1">Iniciar sesión</h1>
+              <p className="text-slate-500 text-sm">Ingresa tus credenciales para acceder al sistema</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label htmlFor="email">Correo</label>
+                <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Correo electrónico
+                </label>
                 <input
                   type="email"
                   id="email"
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className="w-full mt-1.5 px-3 py-2.5"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-slate-900 placeholder-slate-400 bg-slate-50/50 hover:border-slate-300 text-sm min-h-[44px]"
                   placeholder="tu@correo.com"
                   required
+                  autoComplete="username"
                 />
               </div>
+
               <div>
-                <label htmlFor="password">Contraseña</label>
+                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Contraseña
+                </label>
                 <input
                   type="password"
                   id="password"
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className="w-full mt-1.5 px-3 py-2.5"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-slate-900 placeholder-slate-400 bg-slate-50/50 hover:border-slate-300 text-sm min-h-[44px]"
                   placeholder="••••••••"
                   required
+                  autoComplete="current-password"
                 />
               </div>
 
               {error && (
-                <div className="border-[1.5px] border-black bg-[var(--danger-light)] text-[var(--danger)] px-4 py-3 text-sm font-medium">
-                  {error}
+                <div className="flex items-start gap-2.5 bg-red-50 border border-red-100 text-red-700 px-4 py-3 rounded-xl text-sm animate-slide-down">
+                  <span>{error}</span>
                 </div>
               )}
 
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-[var(--primary)] text-black py-3 border-[1.5px] border-black font-bold uppercase text-sm tracking-wider shadow-[4px_4px_0_#101010] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[3px_3px_0_#101010] disabled:opacity-50"
+                className="w-full bg-indigo-600 text-white py-2.5 px-4 rounded-xl font-medium hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 text-sm shadow-lg shadow-indigo-600/20 hover:shadow-xl hover:shadow-indigo-600/30 active:scale-[0.98] min-h-[44px]"
               >
-                {isLoading ? 'Entrando…' : 'Entrar'}
+                {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
               </button>
             </form>
 
             <InstalarAppButton />
+
+            <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+              <p className="text-xs text-slate-400">
+                Rifa Super Toyota © {new Date().getFullYear()} · Todos los derechos reservados
+              </p>
+            </div>
           </div>
         </div>
       </div>

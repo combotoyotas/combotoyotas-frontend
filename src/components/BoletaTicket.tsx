@@ -43,7 +43,6 @@ export default function BoletaTicket(props: BoletaTicketProps) {
     estado,
     clienteInfo,
     deuda,
-    reservadaHasta,
     precio,
     nota,
     hideQr = false,
@@ -74,26 +73,15 @@ export default function BoletaTicket(props: BoletaTicketProps) {
     typeof deuda === 'number'
       ? deuda
       : deuda
-      ? Number(String(deuda).replace(/[^0-9.-]/g, '')) || null
-      : null
+        ? Number(String(deuda).replace(/[^0-9.-]/g, '')) || null
+        : null
+  const precioNum =
+    typeof precio === 'number'
+      ? precio
+      : precio
+        ? Number(String(precio).replace(/[^0-9.-]/g, '')) || null
+        : null
   const tieneCliente = Boolean(clienteInfo && (clienteInfo.nombre || clienteInfo.identificacion))
-
-  const formatDateDisplay = (d?: string | null) => {
-    if (!d) return undefined
-    try {
-      const dt = new Date(d)
-      if (isNaN(dt.getTime())) return d
-      return dt.toLocaleString('es-CO', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    } catch {
-      return d
-    }
-  }
 
   const esReservada = estadoNorm === 'RESERVADA'
   const esCancelada = estadoNorm === 'ANULADA' || estadoNorm === 'CANCELADA'
@@ -102,92 +90,50 @@ export default function BoletaTicket(props: BoletaTicketProps) {
     (estadoPagadoWords.has(estadoNorm) || (tieneCliente && deudaNum === 0)) && tieneCliente
   const esAbonada =
     estadoNorm === 'ABONADA' || (tieneCliente && typeof deudaNum === 'number' && deudaNum > 0)
+
   const { principal, gift } = getPrincipalGift(numeros, numero, numeroPrincipal)
+  const numDisplay = principal ?? numero
 
-  const badge = (label: string, variant: string) => (
-    <div className={`boleta-ticket__badge boleta-ticket__badge--${variant}`}>{label}</div>
-  )
+  const bonoCancelado =
+    tieneCliente &&
+    (estadoPagadoWords.has(estadoNorm) ||
+      (typeof deudaNum === 'number' &&
+        deudaNum <= 0 &&
+        !esReservada &&
+        !esAbonada &&
+        !esCancelada))
 
-  const renderEstado = () => {
-    if (esCancelada) {
-      return (
-        <div className="boleta-ticket__body">
-          {badge('Boleta cancelada', 'cancelada')}
-          <p className="mt-1 text-neutral-400">Esta boleta no tiene validez</p>
-        </div>
-      )
-    }
+  type BarVariant = 'cancelada' | 'bloqueada' | 'reservada' | 'pagada' | 'abonada' | 'disponible'
 
-    if (esReservada && tieneCliente) {
-      return (
-        <div className="boleta-ticket__body">
-          {badge('Reservada', 'reservada')}
-          {typeof deudaNum === 'number' && deudaNum > 0 && (
-            <p className="boleta-ticket__deuda mt-1">
-              Deuda: ${deudaNum.toLocaleString('es-CO')}
-            </p>
-          )}
-          <p className="boleta-ticket__label">A nombre de</p>
-          <p className="boleta-ticket__name">{clienteInfo?.nombre ?? '—'}</p>
-          {!hideIdentificacion && (
-            <p className="boleta-ticket__id">CC. {clienteInfo?.identificacion ?? '—'}</p>
-          )}
-          <p className="mt-1 text-neutral-400">
-            Hasta: {formatDateDisplay(reservadaHasta) ?? '—'}
-          </p>
-        </div>
-      )
-    }
+  let barLabel = 'DISPONIBLE'
+  let barVariant: BarVariant = 'disponible'
 
-    if (esReservada && !tieneCliente) {
-      return (
-        <div className="boleta-ticket__body">
-          {badge('Bloqueada', 'bloqueada')}
-          <p className="mt-1 text-neutral-400">Boleta bloqueada momentáneamente</p>
-        </div>
-      )
-    }
-
-    if (esPagada) {
-      return (
-        <div className="boleta-ticket__body">
-          {badge('Pagada', 'pagada')}
-          <p className="boleta-ticket__label">A nombre de</p>
-          <p className="boleta-ticket__name">{clienteInfo?.nombre ?? '—'}</p>
-          {!hideIdentificacion && (
-            <p className="boleta-ticket__id">CC. {clienteInfo?.identificacion ?? '—'}</p>
-          )}
-        </div>
-      )
-    }
-
-    if (esAbonada) {
-      return (
-        <div className="boleta-ticket__body">
-          {badge('Abonada', 'abonada')}
-          <p className="boleta-ticket__deuda mt-1">
-            Deuda:{' '}
-            {typeof deudaNum === 'number' ? `$${deudaNum.toLocaleString('es-CO')}` : '—'}
-          </p>
-          <p className="boleta-ticket__label">A nombre de</p>
-          <p className="boleta-ticket__name">{clienteInfo?.nombre ?? '—'}</p>
-          {!hideIdentificacion && (
-            <p className="boleta-ticket__id">CC. {clienteInfo?.identificacion ?? '—'}</p>
-          )}
-        </div>
-      )
-    }
-
-    return (
-      <div className="boleta-ticket__body">
-        {badge('Disponible', 'disponible')}
-      </div>
-    )
+  if (esCancelada) {
+    barLabel = 'BOLETA CANCELADA'
+    barVariant = 'cancelada'
+  } else if (esReservada && !tieneCliente) {
+    barLabel = 'BLOQUEADA'
+    barVariant = 'bloqueada'
+  } else if (esReservada) {
+    barLabel = 'RESERVADA'
+    barVariant = 'reservada'
+  } else if (esPagada) {
+    barLabel = 'PAGADA'
+    barVariant = 'pagada'
+  } else if (esAbonada) {
+    barLabel = 'ABONADA'
+    barVariant = 'abonada'
   }
+
+  const showCliente =
+    !esCancelada &&
+    !(esReservada && !tieneCliente) &&
+    barVariant !== 'disponible' &&
+    tieneCliente
 
   return (
     <div
-      className="boleta-ticket"
+      className="boleta-ticket boleta-ticket--oficial"
       style={{
         width: `${BOLETA_WIDTH}px`,
         height: `${ticketHeight}px`,
@@ -198,53 +144,75 @@ export default function BoletaTicket(props: BoletaTicketProps) {
         className="boleta-ticket__left"
         style={{ width: `${BOLETA_LEFT_WIDTH}px`, height: `${ticketHeight}px` }}
       >
-        <div className="boleta-ticket__content">{renderEstado()}</div>
+        <div className="boleta-ticket__rules">
+          <p>- Boleta sin pagar no juega</p>
+          <p>- 128 días de caducidad</p>
+          <p>- Juega hasta quedar en</p>
+          <p>&nbsp;&nbsp;poder del público</p>
+        </div>
 
-        {!hideQr && (
-          <div className="boleta-ticket__qr-wrap">
-            <img src={qrUrl} alt="QR" className="boleta-ticket__qr" />
+        <div className={`boleta-ticket__estado-bar boleta-ticket__estado-bar--${barVariant}`}>
+          {barLabel}
+        </div>
+
+        {esCancelada && (
+          <p className="boleta-ticket__cliente" style={{ fontWeight: 700 }}>
+            Esta boleta no tiene validez
+          </p>
+        )}
+
+        {esReservada && !tieneCliente && (
+          <p className="boleta-ticket__cliente">Boleta bloqueada momentáneamente</p>
+        )}
+
+        {esAbonada && typeof deudaNum === 'number' && deudaNum > 0 && (
+          <p className="boleta-ticket__deuda">Deuda: ${deudaNum.toLocaleString('es-CO')}</p>
+        )}
+
+        {showCliente && (
+          <div className="boleta-ticket__cliente">
+            <p>A nombre de:</p>
+            <p className="boleta-ticket__cliente-name">{clienteInfo?.nombre ?? '—'}</p>
+            {!hideIdentificacion && (
+              <p>CC. {clienteInfo?.identificacion ?? '—'}</p>
+            )}
           </div>
         )}
 
-        {nota && <div className="boleta-ticket__nota">{nota}</div>}
+        {!hideQr && (
+          <img src={qrUrl} alt="QR" className="boleta-ticket__qr" crossOrigin="anonymous" />
+        )}
 
-        <div className="boleta-ticket__footer">
-          <div className="boleta-ticket__numeros">
-            <div className="boleta-ticket__numero-block boleta-ticket__numero-block--principal">
-              <span className="boleta-ticket__numero-label">Número principal</span>
-              <strong className="boleta-ticket__numero-value">
-                #{String(principal ?? 0).padStart(4, '0')}
-              </strong>
-            </div>
-            {gift != null && (
-              <>
-                <div className="boleta-ticket__numero-separator" aria-hidden="true">
-                  +
-                </div>
-                <div className="boleta-ticket__numero-block boleta-ticket__numero-block--regalo">
-                  <span className="boleta-ticket__numero-label">🎁 Número de regalo</span>
-                  <strong className="boleta-ticket__numero-value">
-                    #{String(gift).padStart(4, '0')}
-                  </strong>
-                  <span className="boleta-ticket__regalo-note">
-                    Incluido gratis · otro número de 4 cifras
-                  </span>
-                </div>
-              </>
-            )}
+        {nota && (
+          <div className="boleta-ticket__nota" style={{ fontSize: 7, color: '#555' }}>
+            {nota}
           </div>
-          {typeof precio === 'number' && precio > 0 && (
-            <div className="boleta-ticket__precio">${precio.toLocaleString('es-CO')}</div>
-          )}
+        )}
+
+        <div className="boleta-ticket__numero-grande">
+          #{String(numDisplay ?? 0).padStart(4, '0')}
         </div>
+        {gift != null && (
+          <div className="boleta-ticket__regalo-line">
+            + #{String(gift).padStart(4, '0')}
+          </div>
+        )}
+        {typeof precioNum === 'number' && precioNum > 0 && (
+          <div className="boleta-ticket__precio-grande">
+            ${precioNum.toLocaleString('es-CO')}
+          </div>
+        )}
       </div>
 
-      <div className="flex-shrink-0 h-full" style={{ width: `${BOLETA_RIGHT_WIDTH}px` }}>
+      <div
+        className="boleta-ticket__right"
+        style={{ width: `${BOLETA_RIGHT_WIDTH}px`, height: `${ticketHeight}px` }}
+      >
         {hasImagen && !imageError && imagen ? (
           <img
             src={imagen}
-            className="block w-full h-full"
-            style={{ objectFit: 'fill' }}
+            alt={rifaNombre}
+            crossOrigin="anonymous"
             onLoad={(e) => {
               const img = e.currentTarget
               if (img.naturalWidth > 0) {
@@ -252,19 +220,23 @@ export default function BoletaTicket(props: BoletaTicketProps) {
               }
             }}
             onError={() => setImageError(true)}
-            alt={rifaNombre}
           />
         ) : (
           <div className="boleta-ticket__right-fallback">
-            <div className="text-center">
-              <p>{rifaNombre}</p>
-              <div className="boleta-ticket__fallback-numbers">
-                <strong>Tu número: #{String(principal ?? 0).padStart(4, '0')}</strong>
-                {gift != null && <span>Regalo: #{String(gift).padStart(4, '0')}</span>}
-              </div>
+            <div>
+              <p>
+                <strong>{rifaNombre}</strong>
+              </p>
+              <p>#{String(numDisplay ?? 0).padStart(4, '0')}</p>
             </div>
           </div>
         )}
+        <div className="boleta-bono">
+          <div className="boleta-bono__title">Bono de cancelación</div>
+          <div className={`boleta-bono__value${bonoCancelado ? ' is-cancelado' : ''}`}>
+            {bonoCancelado ? 'Cancelado' : 'Pendiente'}
+          </div>
+        </div>
       </div>
     </div>
   )

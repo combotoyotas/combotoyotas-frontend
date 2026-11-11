@@ -28,6 +28,8 @@ interface BoletaReservada {
   estado_venta: string | null
   origen: 'ONLINE' | 'PUNTO_FISICO'
   fecha_reserva: string | null
+  puede_liberar?: boolean
+  inventario_vendedor_id?: string | null
 }
 
 export default function BoletasReservadasPage() {
@@ -46,6 +48,7 @@ export default function BoletasReservadasPage() {
     mensaje: string
   } | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [userRol, setUserRol] = useState<string | null>(null)
 
   const fetchBoletas = useCallback(async () => {
     try {
@@ -69,6 +72,15 @@ export default function BoletasReservadasPage() {
     if (!token) {
       router.push('/login')
       return
+    }
+    try {
+      const raw = localStorage.getItem('user')
+      if (raw) {
+        const u = JSON.parse(raw)
+        setUserRol(String(u?.rol || '').toUpperCase())
+      }
+    } catch {
+      setUserRol(null)
     }
     fetchBoletas()
   }, [fetchBoletas, router])
@@ -169,6 +181,19 @@ export default function BoletasReservadasPage() {
     return acc
   }, {} as Record<string, BoletaReservada[]>)
 
+  const ventaPuedeLiberarTodas = (ventaId: string) => {
+    const grupo = ventasConBoletas[ventaId]
+    if (!grupo?.length) return false
+    return grupo.every((b) => b.puede_liberar !== false)
+  }
+
+  const scopeHint =
+    userRol === 'VENDEDOR'
+      ? 'Solo ves y puedes liberar boletas reservadas de tu inventario (asignadas a ti o vendidas por ti).'
+      : userRol === 'ADMIN'
+        ? 'Solo ves y puedes liberar boletas reservadas del pool común (sin vendedor asignado).'
+        : null
+
   // Resumen
   const totalReservadas = boletas.length
   const totalOnline = boletas.filter(b => b.origen === 'ONLINE').length
@@ -197,20 +222,25 @@ export default function BoletasReservadasPage() {
   return (
     <div className="px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
       <div className="max-w-7xl">
-        <div className="mb-6 border-b-[1.5px] border-black pb-4">
+        <div className="mb-6 pb-4 border-b border-slate-200/80">
           <div className="flex items-end justify-between gap-4 flex-wrap">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">Inventario</p>
-              <h1 className="text-2xl sm:text-3xl font-[800] tracking-tight mt-1" style={{ fontFamily: 'var(--font-display)' }}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Inventario</p>
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mt-1 text-slate-900">
                 Boletas reservadas
               </h1>
-              <p className="text-sm text-[var(--text-secondary)] mt-1">
-                Administra y libera boletas reservadas sin pago.
+              <p className="text-sm text-slate-500 mt-1">
+                Administra y libera boletas en estado reservado (sin pago confirmado).
               </p>
+              {scopeHint && (
+                <p className="text-sm text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mt-2 max-w-2xl">
+                  {scopeHint}
+                </p>
+              )}
             </div>
             <button
               onClick={fetchBoletas}
-              className="px-4 py-2 bg-[var(--surface-elevated)] border-[1.5px] border-black text-black font-bold uppercase text-xs tracking-wider shadow-[3px_3px_0_#101010] hover:bg-[var(--primary)] flex items-center gap-2"
+              className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 hover:border-slate-300 flex items-center gap-2 min-h-[44px]"
             >
               Actualizar
             </button>
@@ -437,7 +467,8 @@ export default function BoletasReservadasPage() {
                               id: boleta.boleta_id,
                               mensaje: `¿Liberar la boleta #${formatNumeroBoleta(boleta.numero, boleta.numeros)}? Quedará disponible para la venta nuevamente.`
                             })}
-                            disabled={liberando === boleta.boleta_id}
+                            disabled={liberando === boleta.boleta_id || boleta.puede_liberar === false}
+                            title={boleta.puede_liberar === false ? 'No puedes liberar esta boleta con tu rol' : undefined}
                             className="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {liberando === boleta.boleta_id ? (
@@ -458,7 +489,10 @@ export default function BoletasReservadasPage() {
                                 id: boleta.venta_id!,
                                 mensaje: `¿Liberar TODAS las ${ventasConBoletas[boleta.venta_id!].length} boletas de esta venta? La venta será cancelada.`
                               })}
-                              disabled={liberandoVenta === boleta.venta_id}
+                              disabled={
+                                liberandoVenta === boleta.venta_id ||
+                                !ventaPuedeLiberarTodas(boleta.venta_id!)
+                              }
                               className="px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {liberandoVenta === boleta.venta_id ? (

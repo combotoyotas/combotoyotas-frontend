@@ -40,6 +40,34 @@ class BoletaApiService {
     return this.handleResponse<BoletaListResponse>(response)
   }
 
+  async getBoletasCuadricula(
+    rifaId: string,
+    options?: { vendedorId?: string }
+  ): Promise<{
+    success: boolean
+    data: {
+      rifa: { id: string; nombre: string; estado: string; total_boletas: number } | null
+      alcance: 'pool_libre' | 'inventario_vendedor' | 'todas'
+      boletas: Array<{
+        id: string
+        numero: number
+        numero_principal: number
+        estado: string
+        tipo_estado: string
+        comprable?: boolean
+      }>
+    }
+  }> {
+    const qs =
+      options?.vendedorId != null && options.vendedorId !== ''
+        ? `?vendedor_id=${encodeURIComponent(options.vendedorId)}`
+        : ''
+    const response = await fetch(`${API_BASE_URL}/api/boletas/rifa/${rifaId}/cuadricula${qs}`, {
+      headers: this.getAuthHeaders(),
+    })
+    return this.handleResponse(response)
+  }
+
   async getBoletaById(boletaId: string): Promise<BoletaDetailResponse> {
     const response = await fetch(`${API_BASE_URL}/api/boletas/${boletaId}`, {
       headers: this.getAuthHeaders()

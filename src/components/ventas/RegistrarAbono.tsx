@@ -13,7 +13,9 @@ import { generarWhatsAppChatLink } from '@/utils/telefono'
 import { WHATSAPP_VENTAS_ACTIVO } from '@/config/features'
 import { formatBoletaNumeros } from '@/utils/formatBoletaNumeros'
 import PrincipalGiftLabel from '@/components/ventas/PrincipalGiftLabel'
-import { formatAbonoRegistradoPor } from '@/utils/formatAbonoRegistradoPor'
+import { formatRegistradoConRol } from '@/utils/formatAbonoRegistradoPor'
+import { ajustesApi, type LineaVentaItem, type MedioPagoItem } from '@/lib/ajustesApi'
+import { TokenManager } from '@/utils/auth'
 
 interface Props {
   ventaId: string
@@ -35,9 +37,11 @@ interface AbonoBoletaHistorial {
   estado: string
   referencia: string | null
   metodo_pago: string
+  linea_venta_nombre?: string | null
   notas: string | null
   fecha: string
   registrado_por_nombre?: string | null
+  registrado_por_rol?: string | null
 }
 
 interface AbonoVenta {
@@ -175,6 +179,10 @@ function buildReciboData(
   }
 }
 
+function labelMedio(medios: MedioPagoItem[], id: string) {
+  return medios.find((m) => m.id === id)?.nombre || id
+}
+
 function estadoBoletaTicket(b: BoletaVenta): string {
   if (b.estado === 'PAGADA') return 'PAGADA'
   if (b.estado === 'ABONADA' || ((b.total_pagado_boleta ?? 0) > 0 && (b.saldo_pendiente_boleta ?? 0) > 0)) {
@@ -183,13 +191,6 @@ function estadoBoletaTicket(b: BoletaVenta): string {
   if (b.estado === 'RESERVADA') return 'RESERVADA'
   return b.estado
 }
-
-const MEDIOS_PAGO = [
-  { id: 'efectivo', label: 'Efectivo' },
-  { id: 'nequi', label: 'Nequi' },
-  { id: 'daviplata', label: 'Daviplata' },
-  { id: 'transferencia', label: 'PSE' },
-]
 
 export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: Props) {
   const [venta, setVenta] = useState<VentaNormalizada | null>(null)
@@ -209,9 +210,35 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
   const [boletasSeleccionadas, setBoletasSeleccionadas] = useState<BoletasSeleccionadas>({})
   const [historialExpandido, setHistorialExpandido] = useState<Record<string, boolean>>({})
   const [mostrarConfirmacionAbono, setMostrarConfirmacionAbono] = useState(false)
+  const [mediosPago, setMediosPago] = useState<MedioPagoItem[]>([])
+  const [lineasVenta, setLineasVenta] = useState<LineaVentaItem[]>([])
+  const [lineaVentaId, setLineaVentaId] = useState('')
+  const [esVendedor, setEsVendedor] = useState(false)
+  const [requiereLinea, setRequiereLinea] = useState(false)
 
   useEffect(() => {
     cargarDetalle()
+    const user = TokenManager.getUser()
+    const rol = String(user?.rol || '').toUpperCase()
+    setEsVendedor(rol === 'VENDEDOR')
+    const needLinea = rol === 'VENDEDOR' || rol === 'ADMIN' || rol === 'SUPER_ADMIN'
+    setRequiereLinea(needLinea)
+    ajustesApi
+      .mediosParaVentas()
+      .then((m) => {
+        setMediosPago(m)
+        setMetodoPago((prev) => (prev && m.some((x) => x.id === prev) ? prev : m[0]?.id || ''))
+      })
+      .catch(() => setMediosPago([]))
+    if (needLinea) {
+      ajustesApi
+        .lineasParaVentas()
+        .then((l) => {
+          setLineasVenta(l)
+          if (l.length === 1) setLineaVentaId(l[0].id)
+        })
+        .catch(() => setLineasVenta([]))
+    }
   }, [ventaId])
 
   const cargarDetalle = async (opts?: { silent?: boolean }): Promise<VentaNormalizada | null> => {
@@ -291,8 +318,24 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
         return
       }
 
+      if (esVendedor && mediosPago.length === 0) {
+        setError('Configura al menos un medio de pago en Ajustes antes de abonar')
+        return
+      }
       if (!metodoPago || metodoPago.trim() === '') {
         setError('Debe seleccionar un método de pago')
+        return
+      }
+      if (requiereLinea && lineasVenta.length === 0) {
+        setError(
+          esVendedor
+            ? 'Configura al menos una línea de venta en Ajustes'
+            : 'No hay líneas globales; el super admin debe crearlas en Ajustes'
+        )
+        return
+      }
+      if (requiereLinea && !lineaVentaId) {
+        setError('Selecciona la línea de venta por la que se recibió el pago')
         return
       }
 
@@ -304,7 +347,8 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
           monto: totalMulti,
           metodo_pago: metodoPago,
           notas: notasAbono,
-          boletas_abono: boletasAbono
+          boletas_abono: boletasAbono,
+          linea_venta_id: lineaVentaId || undefined,
         })
         const ventaActualizada = await cargarDetalle({ silent: true })
         if (!ventaActualizada) return
@@ -325,7 +369,7 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
         ]
 
         const esPagoTotal = ventaActualizada.saldo_pendiente <= 0
-        const mpLabel = MEDIOS_PAGO.find((m) => m.id === metodoPago)?.label || metodoPago
+        const mpLabel = labelMedio(mediosPago, metodoPago)
 
         setBoletasDescargaIds(boletasAbono.map((ba) => ba.boleta_id))
         setExitoReciente({
@@ -368,8 +412,24 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
         return
       }
 
+      if (esVendedor && mediosPago.length === 0) {
+        setError('Configura al menos un medio de pago en Ajustes antes de abonar')
+        return
+      }
       if (!metodoPago || metodoPago.trim() === '') {
         setError('Debe seleccionar un método de pago')
+        return
+      }
+      if (requiereLinea && lineasVenta.length === 0) {
+        setError(
+          esVendedor
+            ? 'Configura al menos una línea de venta en Ajustes'
+            : 'No hay líneas globales; el super admin debe crearlas en Ajustes'
+        )
+        return
+      }
+      if (requiereLinea && !lineaVentaId) {
+        setError('Selecciona la línea de venta por la que se recibió el pago')
         return
       }
 
@@ -380,7 +440,8 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
         await ventasApi.registrarAbono(ventaId, {
           monto: montoValidado,
           metodo_pago: metodoPago,
-          notas: notasAbono
+          notas: notasAbono,
+          linea_venta_id: lineaVentaId || undefined,
         })
         const ventaActualizada = await cargarDetalle({ silent: true })
         if (!ventaActualizada) return
@@ -390,7 +451,7 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
         setAccion(null)
 
         const esPagoTotal = ventaActualizada.saldo_pendiente <= 0
-        const mpLabelGen = MEDIOS_PAGO.find((m) => m.id === metodoPago)?.label || metodoPago
+        const mpLabelGen = labelMedio(mediosPago, metodoPago)
 
         setBoletasDescargaIds((ventaActualizada.boletas || []).map((b) => b.id))
         setExitoReciente({
@@ -849,8 +910,16 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
                             <div className="text-slate-600">
                               {abono.metodo_pago}
                             </div>
+                            {abono.linea_venta_nombre && (
+                              <div className="text-slate-600">Línea: {abono.linea_venta_nombre}</div>
+                            )}
                             <div className="text-slate-700 font-medium mt-0.5">
-                              Por: {formatAbonoRegistradoPor(abono.registrado_por_nombre, abono.metodo_pago)}
+                              Por:{' '}
+                              {formatRegistradoConRol(
+                                abono.registrado_por_nombre,
+                                abono.registrado_por_rol,
+                                abono.metodo_pago
+                              )}
                             </div>
                             {abono.notas && (
                               <div className="text-slate-400 italic mt-0.5 truncate">
@@ -1108,13 +1177,33 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
                 className="w-full px-4 py-2 border border-slate-400 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 bg-white text-black"
               >
                 <option value="">Selecciona método de pago</option>
-                {MEDIOS_PAGO.map((m) => (
+                {mediosPago.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.label}
+                    {m.nombre}
                   </option>
                 ))}
               </select>
             </div>
+
+            {requiereLinea && (
+              <div className="space-y-2">
+                <label className="block text-sm font-bold text-black mb-1">
+                  Línea de venta
+                </label>
+                <select
+                  value={lineaVentaId}
+                  onChange={(e) => setLineaVentaId(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">Seleccionar canal…</option>
+                  {lineasVenta.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Si NO hay boletas seleccionadas, mostrar input de monto general */}
             {Object.keys(boletasSeleccionadas).length === 0 && (
@@ -1261,7 +1350,7 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-600">Método de pago:</span>
-                      <span className="font-medium text-slate-900">{MEDIOS_PAGO.find(m => m.id === metodoPago)?.label || metodoPago}</span>
+                      <span className="font-medium text-slate-900">{labelMedio(mediosPago, metodoPago)}</span>
                     </div>
                   </div>
                   

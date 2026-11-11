@@ -1,31 +1,24 @@
 import type { Metadata, Viewport } from "next";
-import { Syne, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import PausaGuard from "@/components/PausaGuard";
-import AdminRouteShell from "@/components/admin/AdminRouteShell";
+import ModuleShell from "@/components/layout/ModuleShell";
+import PwaNativeEffects from "@/components/pwa/PwaNativeEffects";
 
-const syne = Syne({
-  variable: "--font-syne",
+const geistSans = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
 });
 
-const plex = IBM_Plex_Sans({
-  variable: "--font-plex",
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const plexMono = IBM_Plex_Mono({
-  variable: "--font-plex-mono",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
-  title: "Sueños Dorados | Panel",
-  description: "Gestión interna de proyectos, ventas y sorteos",
-  applicationName: "SD Panel",
+  title: "Rifa Super Toyota | Panel de Administración",
+  description: "Plataforma rifasupertoyota — gestión de rifas, ventas y sorteos",
+  applicationName: "Rifa Super Toyota",
   manifest: "/manifest.webmanifest",
   robots: {
     index: false,
@@ -35,8 +28,13 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
-    title: "SD Panel",
+    statusBarStyle: "default",
+    title: "Rifa Super Toyota",
+  },
+  formatDetection: {
+    telephone: false,
+    email: false,
+    address: false,
   },
   icons: {
     icon: [
@@ -48,7 +46,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#101010",
+  themeColor: "#4f46e5",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -59,10 +62,11 @@ export default function RootLayout({
   return (
     <html lang="es" className="scroll-smooth">
       <body
-        className={`${syne.variable} ${plex.variable} ${plexMono.variable} antialiased min-h-screen bg-[var(--background)] text-[var(--text-primary)]`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen min-h-dvh bg-[#f8fafc]`}
       >
+        <PwaNativeEffects />
         <PausaGuard>
-          <AdminRouteShell>{children}</AdminRouteShell>
+          <ModuleShell>{children}</ModuleShell>
         </PausaGuard>
       </body>
     </html>

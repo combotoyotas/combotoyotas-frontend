@@ -67,17 +67,6 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
     }
   }
 
-  const checkIdentificacionDuplicate = async (identificacion: string): Promise<boolean> => {
-    try {
-      const response = await clienteApi.getClienteByIdentificacion(identificacion)
-      // Si encontramos un cliente con esa cédula y no es el cliente que estamos editando
-      return response.data.id !== cliente?.id
-    } catch (error) {
-      // Si hay un error (404), significa que no existe un cliente con esa cédula
-      return false
-    }
-  }
-
   const validateForm = async () => {
     const newErrors: Record<string, string> = {}
 
@@ -92,18 +81,6 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
     }
     if (!formData.identificacion.trim()) {
       newErrors.identificacion = 'La identificación es requerida'
-    } else if (cliente && formData.identificacion !== cliente.identificacion) {
-      // Solo verificar duplicados si la cédula cambió y estamos editando
-      const isDuplicate = await checkIdentificacionDuplicate(formData.identificacion)
-      if (isDuplicate) {
-        newErrors.identificacion = 'Esta identificación ya está registrada en otro cliente'
-      }
-    } else if (!cliente) {
-      // Para nuevos clientes, siempre verificar duplicados
-      const isDuplicate = await checkIdentificacionDuplicate(formData.identificacion)
-      if (isDuplicate) {
-        newErrors.identificacion = 'Esta identificación ya está registrada'
-      }
     }
     if (!formData.direccion.trim()) {
       newErrors.direccion = 'La dirección es requerida'
@@ -134,10 +111,17 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-light text-slate-900">
-          {cliente ? 'Editar Cliente' : 'Nuevo Cliente'}
-        </h2>
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h2 className="text-xl font-light text-slate-900">
+            {cliente ? 'Editar Cliente' : 'Nuevo Cliente'}
+          </h2>
+          {cliente?.codigo && (
+            <p className="text-sm text-slate-500 mt-1 font-mono">
+              Código de ficha: <span className="font-semibold text-slate-800">{cliente.codigo}</span>
+            </p>
+          )}
+        </div>
         <button
           onClick={onCancel}
           className="text-slate-400 hover:text-slate-600 transition-colors"
@@ -237,6 +221,11 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
             </div>
             {errors.identificacion && (
               <p className="mt-1 text-sm text-red-600">{errors.identificacion}</p>
+            )}
+            {!cliente && (
+              <p className="mt-1 text-xs text-slate-500">
+                La cédula puede repetirse entre vendedores. Al guardar, el sistema asigna un código único de ficha.
+              </p>
             )}
           </div>
         </div>

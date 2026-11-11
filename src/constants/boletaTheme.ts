@@ -1,30 +1,44 @@
-/** Estilos compartidos para HTML inline (descarga masiva en BoletaList). */
+/** Estilos inline para descarga masiva (mismo diseño oficial blanco). */
 export const BOLETA_TICKET_STYLE =
-  'display:flex;overflow:hidden;background:linear-gradient(180deg,#0c0c0c 0%,#121212 100%);border:1px solid #3a3220;box-shadow:inset 0 1px 0 rgba(212,175,55,0.12);'
+  'display:flex;overflow:hidden;background:#fff;color:#111;border:1px solid #111;font-family:Helvetica,Arial,sans-serif;'
 
 export const BOLETA_LEFT_STYLE =
-  'flex-shrink:0;padding:10px 8px;display:flex;flex-direction:column;justify-content:space-between;align-items:center;border-right:1px solid rgba(201,162,39,0.22);font-family:var(--font-geist-sans,system-ui,sans-serif);text-align:center;'
+  'flex-shrink:0;background:#fff;display:flex;flex-direction:column;align-items:center;text-align:center;border-right:1px solid #111;box-sizing:border-box;padding:8px 6px 10px;'
 
 export const BOLETA_BODY_TEXT =
-  'font-size:9px;color:#d4d4d4;line-height:1.45;text-align:center;width:100%;display:flex;flex-direction:column;align-items:center;'
+  'font-size:9px;color:#111;line-height:1.35;text-align:center;width:100%;'
+
+export const BOLETA_RULES_HTML = `
+  <div style="font-size:9px;line-height:1.35;width:100%;margin-bottom:6px;text-align:center;">
+    <p style="margin:0">- Boleta sin pagar no juega</p>
+    <p style="margin:0">- 128 días de caducidad</p>
+    <p style="margin:0">- Juega hasta quedar en</p>
+    <p style="margin:0">&nbsp;&nbsp;poder del público</p>
+  </div>`
 
 export const BOLETA_BADGE_STYLES: Record<string, string> = {
   pagada:
-    'width:100%;padding:5px 0;text-align:center;font-weight:700;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;background:rgba(16,185,129,0.14);color:#6ee7b7;border:1px solid rgba(52,211,153,0.35);border-radius:3px;',
+    'width:100%;padding:4px 2px;font-size:9px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#fff;margin-bottom:6px;background:#15803d;',
   reservada:
-    'width:100%;padding:5px 0;text-align:center;font-weight:700;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;background:rgba(59,130,246,0.14);color:#93c5fd;border:1px solid rgba(96,165,250,0.35);border-radius:3px;',
+    'width:100%;padding:4px 2px;font-size:9px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#fff;margin-bottom:6px;background:#2563eb;',
   bloqueada:
-    'width:100%;padding:5px 0;text-align:center;font-weight:700;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;background:rgba(251,191,36,0.12);color:#fcd34d;border:1px solid rgba(251,191,36,0.3);border-radius:3px;',
+    'width:100%;padding:4px 2px;font-size:9px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#111;margin-bottom:6px;background:#fde047;',
   abonada:
-    'width:100%;padding:5px 0;text-align:center;font-weight:700;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;background:rgba(201,162,39,0.14);color:#d4af37;border:1px solid rgba(212,175,55,0.35);border-radius:3px;',
+    'width:100%;padding:4px 2px;font-size:9px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#111;margin-bottom:6px;background:#fb923c;',
   disponible:
-    'width:100%;padding:5px 0;text-align:center;font-weight:700;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;background:rgba(163,163,163,0.1);color:#d4d4d4;border:1px solid rgba(163,163,163,0.25);border-radius:3px;',
+    'width:100%;padding:4px 2px;font-size:9px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#111;margin-bottom:6px;background:#6ee7b7;',
   cancelada:
-    'width:100%;padding:5px 0;text-align:center;font-weight:700;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;background:rgba(239,68,68,0.14);color:#fca5a5;border:1px solid rgba(248,113,113,0.35);border-radius:3px;',
+    'width:100%;padding:4px 2px;font-size:9px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#fff;margin-bottom:6px;background:#dc2626;',
 }
 
 export const BOLETA_NUMERO_STYLE =
-  'text-align:center;font-size:17px;font-weight:700;color:#d4af37;letter-spacing:0.06em;font-variant-numeric:tabular-nums;line-height:1.2;display:flex;flex-direction:column;align-items:center;gap:2px;'
+  'font-size:28px;font-weight:700;line-height:1;margin-top:6px;color:#111;text-align:center;'
 
 export const BOLETA_PRECIO_STYLE =
-  'text-align:center;font-size:11px;font-weight:600;color:#c9a227;letter-spacing:0.04em;'
+  'font-size:12px;font-weight:700;margin-top:4px;color:#111;text-align:center;'
+
+export const BOLETA_BONO_HTML = (cancelado: boolean) => `
+  <div style="position:absolute;right:6px;bottom:6px;z-index:5;background:rgba(255,255,255,0.94);border:1px solid #111;border-radius:2px;padding:4px 6px 5px;min-width:88px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);">
+    <div style="font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:0.02em;color:#111;">Bono de cancelación</div>
+    <div style="font-size:10px;font-weight:800;margin-top:2px;color:${cancelado ? '#15803d' : '#737373'};">${cancelado ? 'Cancelado' : 'Pendiente'}</div>
+  </div>`

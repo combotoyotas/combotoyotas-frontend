@@ -5,6 +5,8 @@ import { useRouter, useParams } from 'next/navigation'
 import { boletaApi } from '@/lib/boletaApi'
 import type { BoletaDetail } from '@/types/boleta'
 import BoletaDetailComponent from '@/components/BoletaDetail'
+import { formatBoletaNumeros } from '@/utils/formatBoletaNumeros'
+import { boletaEstadoDisplay } from '@/utils/boletaEstadoDisplay'
 
 export default function BoletaDetailPage() {
   const params = useParams()
@@ -126,45 +128,59 @@ export default function BoletaDetailPage() {
     )
   }
 
+  const numeroLabel = formatBoletaNumeros(boleta.numeros, boleta.numero)
+  const estadoUi = boletaEstadoDisplay(boleta.estado)
+
   return (
-    <div className="app-shell">
-      <header className="app-header sticky top-0 z-30">
+    <div className="app-shell pb-4 lg:pb-0">
+      <header className="app-header sticky top-0 z-30 hidden lg:block">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
+          <div className="flex justify-between items-center h-16 gap-4">
+            <div className="flex items-center gap-4 min-w-0">
               <button
+                type="button"
                 onClick={() => router.push('/boletas/ver')}
-                className="text-slate-600 hover:text-slate-900 transition-colors"
+                className="text-slate-600 hover:text-slate-900 transition-colors shrink-0"
               >
                 ← Boletas
               </button>
-              <h1 className="text-2xl font-light text-neutral-100">Detalles de Boleta</h1>
+              <h1 className="text-xl font-semibold text-neutral-100 truncate">Detalles de Boleta</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-slate-600 font-mono">
-                Boleta {Array.isArray((boleta as any).numeros) && (boleta as any).numeros.length
-                  ? (boleta as any).numeros.map((n: number) => `#${String(n).padStart(4, '0')}`).join(' · ')
-                  : `#${boleta.numero.toString().padStart(4, '0')}`}
-              </span>
-              <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                boleta.estado === 'DISPONIBLE' ? 'bg-green-100 text-green-800' :
-                boleta.estado === 'RESERVADA' ? 'bg-yellow-100 text-yellow-800' :
-                boleta.estado === 'CON_PAGO' ? 'bg-blue-100 text-blue-800' :
-                boleta.estado === 'TRANSFERIDA' ? 'bg-purple-100 text-purple-800' :
-                'bg-red-100 text-red-800'
-              }`}>
-                {boleta.estado === 'DISPONIBLE' ? 'Disponible' :
-                 boleta.estado === 'RESERVADA' ? 'Reservada' :
-                 boleta.estado === 'CON_PAGO' ? 'Con Pago' :
-                 boleta.estado === 'TRANSFERIDA' ? 'Transferida' :
-                 boleta.estado}
+            <div className="flex items-center gap-3 shrink-0">
+              <span className="text-sm text-slate-300 font-mono">#{numeroLabel}</span>
+              <span className={`inline-flex px-2.5 py-1 text-xs font-semibold rounded-full ${estadoUi.badgeClass}`}>
+                {estadoUi.label.toUpperCase()}
               </span>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-8">
+        <div className="lg:hidden mb-4">
+          <button
+            type="button"
+            onClick={() => router.push('/boletas/ver')}
+            className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 min-h-[44px] -ml-1 px-1"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Boletas
+          </button>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <h1 className="text-lg font-bold text-slate-900 leading-snug">Detalle de boleta</h1>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <span className="font-mono text-sm font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-lg">
+              #{numeroLabel}
+            </span>
+            <span className={`inline-flex px-2.5 py-1 text-xs font-bold rounded-full ${estadoUi.badgeClass}`}>
+              {estadoUi.label.toUpperCase()}
+            </span>
+          </div>
+        </div>
+
         <BoletaDetailComponent boleta={boleta} onPrint={handlePrint} />
       </main>
     </div>

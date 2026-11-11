@@ -50,7 +50,16 @@ export default function SelectorBoletas({
     bloqueada?: boolean
     cliente_nombre?: string | null
     cliente_identificacion?: string | null
+    inventario_info?: { id: string; nombre: string } | null
+    detalle_busqueda?: {
+      titulo: string
+      motivos: { clave: string; texto: string }[]
+      en_tu_inventario?: boolean
+      puede_ver_cliente?: boolean
+    }
+    en_tu_inventario?: boolean | null
   } | null>(null)
+  const [boletaNoExiste, setBoletaNoExiste] = useState(false)
   const [buscandoExacta, setBuscandoExacta] = useState(false)
   const intervalosRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map())
   const seleccionadasIdsRef = useRef<Set<string>>(new Set())
@@ -388,12 +397,6 @@ if (interval) {
       )
     : null
 
-  const boletaBuscadaEsPropia = Boolean(
-    boletaSeleccionadaPorBusqueda ||
-      (boletaBuscada &&
-        boletasSeleccionadas.some((b) => b.id === boletaBuscada.id))
-  )
-
   const boletaEnCarrito =
     boletaSeleccionadaPorBusqueda ||
     (boletaBuscada
@@ -401,14 +404,18 @@ if (interval) {
       : null) ||
     null
 
-  const mostrarNoDisponible =
-    Boolean(
-      busqueda &&
-        boletaBuscada &&
-        !boletaBuscada.disponible &&
-        !exactaDisponible &&
-        !boletaBuscadaEsPropia
-    )
+  const esBoletaPropiaInventario = Boolean(
+    boletaBuscada?.detalle_busqueda?.en_tu_inventario ||
+      boletaBuscada?.en_tu_inventario
+  )
+
+  const mostrarNoDisponible = Boolean(
+    busqueda &&
+      boletaBuscada &&
+      !exactaDisponible &&
+      !boletaEnCarrito &&
+      !boletaBuscada.disponible
+  )
 
   // Consultar estado de la boleta exacta si no está en disponibles
   useEffect(() => {
@@ -420,6 +427,7 @@ if (interval) {
 
     if (!term) {
       setBoletaBuscada(null)
+      setBoletaNoExiste(false)
       setBuscandoExacta(false)
       return
     }
@@ -427,6 +435,7 @@ if (interval) {
     // Esperar número completo (o al menos 3 dígitos) para no spamear API
     if (term.length < 3) {
       setBoletaBuscada(null)
+      setBoletaNoExiste(false)
       setBuscandoExacta(false)
       return
     }
@@ -436,6 +445,7 @@ if (interval) {
     )
     if (enDisponibles) {
       setBoletaBuscada(null)
+      setBoletaNoExiste(false)
       setBuscandoExacta(false)
       return
     }
@@ -445,11 +455,13 @@ if (interval) {
     )
     if (enSeleccion) {
       setBoletaBuscada(null)
+      setBoletaNoExiste(false)
       setBuscandoExacta(false)
       return
     }
 
     setBuscandoExacta(true)
+    setBoletaNoExiste(false)
     busquedaExactaTimerRef.current = setTimeout(async () => {
       try {
         const numero = Number(term.replace(/^0+/, '') || term)
@@ -457,6 +469,7 @@ if (interval) {
         const data = response.data
         if (!data) {
           setBoletaBuscada(null)
+          setBoletaNoExiste(true)
           return
         }
         setBoletaBuscada({
@@ -468,9 +481,15 @@ if (interval) {
           bloqueada: Boolean(data.bloqueada),
           cliente_nombre: data.cliente_nombre,
           cliente_identificacion: data.cliente_identificacion,
+          inventario_info: data.inventario_info ?? null,
+          detalle_busqueda: data.detalle_busqueda,
+          en_tu_inventario: data.en_tu_inventario,
         })
-      } catch {
+        setBoletaNoExiste(false)
+      } catch (err: unknown) {
+        const status = (err as { response?: { status?: number } })?.response?.status
         setBoletaBuscada(null)
+        setBoletaNoExiste(status === 404)
       } finally {
         setBuscandoExacta(false)
       }
@@ -612,7 +631,7 @@ useEffect(() => {
               : exactaDisponible
                 ? 'Disponible — elígela abajo para agregarla.'
                 : mostrarNoDisponible
-                  ? 'Ocupada por otro cliente. Abajo verás números parecidos disponibles.'
+                  ? `${boletaBuscada?.detalle_busqueda?.titulo || 'No disponible'}. Abajo verás números parecidos si hay.`
                   : buscandoExacta
                     ? 'Consultando estado del número...'
                     : 'Buscando coincidencia exacta o números parecidos...'}
@@ -686,32 +705,62 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Resultado exacto no disponible (solo si NO es tuya) */}
+      {boletaNoExiste && busqueda && !buscandoExacta && (
+        <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+          No existe una boleta con ese número en este proyecto.
+        </div>
+      )}
+
+      {/* Resultado exacto no disponible u ocupada (incluye tu inventario con cliente) */}
       {mostrarNoDisponible && boletaBuscada && (
-        <div className="mb-4 rounded-lg border-2 border-amber-400 bg-amber-50 p-4">
+        <div
+          className={`mb-4 rounded-lg border-2 p-4 ${
+            esBoletaPropiaInventario
+              ? 'border-blue-400 bg-blue-50'
+              : 'border-amber-400 bg-amber-50'
+          }`}
+        >
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
-                Ocupada por otro cliente
+            <div className="min-w-0 flex-1">
+              <p
+                className={`text-xs font-semibold uppercase tracking-wide ${
+                  esBoletaPropiaInventario ? 'text-blue-800' : 'text-amber-800'
+                }`}
+              >
+                {boletaBuscada.detalle_busqueda?.titulo || 'No disponible para venta'}
               </p>
               <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">
                 {formatBoletaNumeros(boletaBuscada.numeros, boletaBuscada.numero)}
               </p>
               <p className="mt-1 text-sm text-amber-900">
                 Estado: <span className="font-semibold">{boletaBuscada.estado}</span>
-                {boletaBuscada.bloqueada ? ' (bloqueada temporalmente)' : ''}
+                {boletaBuscada.bloqueada ? ' · bloqueo temporal' : ''}
               </p>
-              {boletaBuscada.cliente_nombre && (
-                <p className="mt-1 text-sm text-slate-700">
-                  Cliente: {boletaBuscada.cliente_nombre}
-                  {boletaBuscada.cliente_identificacion
-                    ? ` · CC ${boletaBuscada.cliente_identificacion}`
-                    : ''}
-                </p>
-              )}
+              {boletaBuscada.detalle_busqueda?.motivos &&
+              boletaBuscada.detalle_busqueda.motivos.length > 0 ? (
+                <ul className="mt-3 space-y-1.5">
+                  {boletaBuscada.detalle_busqueda.motivos.map((m) => (
+                    <li
+                      key={m.clave + m.texto}
+                      className="flex gap-2 text-sm text-slate-800 leading-snug"
+                    >
+                      <span className="text-amber-600 shrink-0" aria-hidden>
+                        •
+                      </span>
+                      <span>{m.texto}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
-            <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-bold uppercase text-amber-900">
-              No disponible
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-bold uppercase shrink-0 ${
+                esBoletaPropiaInventario
+                  ? 'bg-blue-200 text-blue-900'
+                  : 'bg-amber-200 text-amber-900'
+              }`}
+            >
+              {esBoletaPropiaInventario ? 'Tu inventario' : 'No disponible'}
             </span>
           </div>
         </div>

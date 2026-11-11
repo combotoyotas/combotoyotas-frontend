@@ -131,7 +131,7 @@ export default function ListaVentasPublicas({
         ? boletasList.map((b: any) => formatPacha(b.numeros, b.numero)).join(', ')
         : venta.numeros_boletas && venta.numeros_boletas.length > 0
           ? formatPachasDesdeNumerosPlanos(venta.numeros_boletas.map(Number), venta.cantidad_boletas)
-          : `${venta.cantidad_boletas} pacha(s)`
+          : `${venta.cantidad_boletas} boleta(s)`
 
     let mensaje = ''
 

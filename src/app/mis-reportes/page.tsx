@@ -99,13 +99,13 @@ export default function MisReportesPage() {
     <div className="w-full min-w-0">
       {esAdmin && (
         <div className="px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
-          <div className="inline-flex border-[1.5px] border-black bg-white shadow-[3px_3px_0_#101010] overflow-hidden">
+          <div className="inline-flex border border-slate-200 bg-white shadow-sm overflow-hidden rounded-xl">
             <button
               type="button"
               onClick={() => setScope('global')}
               className={`px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wide min-h-[44px] transition-colors ${
                 activeScope === 'global'
-                  ? 'bg-[var(--primary)] text-black'
+                  ? 'bg-indigo-600 text-white'
                   : 'bg-white text-slate-700 hover:bg-slate-50'
               }`}
             >
@@ -114,9 +114,9 @@ export default function MisReportesPage() {
             <button
               type="button"
               onClick={() => setScope('mis-ventas')}
-              className={`px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wide min-h-[44px] border-l-[1.5px] border-black transition-colors ${
+              className={`px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wide min-h-[44px] border-l border-slate-200 transition-colors ${
                 activeScope === 'mis-ventas'
-                  ? 'bg-[var(--primary)] text-black'
+                  ? 'bg-indigo-600 text-white'
                   : 'bg-white text-slate-700 hover:bg-slate-50'
               }`}
             >

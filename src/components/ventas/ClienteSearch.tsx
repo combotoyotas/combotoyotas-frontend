@@ -296,6 +296,9 @@ export default function ClienteSearch({
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold text-slate-900">{cliente.nombre}</div>
                   <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+                    {cliente.codigo && (
+                      <span className="font-mono text-slate-500">{cliente.codigo}</span>
+                    )}
                     {cliente.identificacion && (
                       <span>C.C: {cliente.identificacion}</span>
                     )}
@@ -592,7 +595,7 @@ export default function ClienteSearch({
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 flex items-start gap-2">
             <Sparkles className="w-5 h-5 shrink-0 text-emerald-600 mt-0.5" />
             <span>
-              Completa nombre y teléfono. Si el cliente ya existe, te avisamos antes de duplicarlo.
+              Completa nombre y teléfono. Puedes usar la misma cédula en otra ficha; el sistema asigna un código único por registro.
             </span>
           </div>
 

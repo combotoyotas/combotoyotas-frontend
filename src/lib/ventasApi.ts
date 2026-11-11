@@ -121,6 +121,14 @@ class VentasApiService {
       bloqueo_hasta?: string | null
       cliente_nombre?: string | null
       cliente_identificacion?: string | null
+      inventario_info?: { id: string; nombre: string } | null
+      motivo_bloqueo_inventario?: string | null
+      en_tu_inventario?: boolean | null
+      detalle_busqueda?: {
+        titulo: string
+        motivos: { clave: string; texto: string }[]
+        en_tu_inventario?: boolean
+      }
       qr_url?: string
       barcode?: string
       imagen_url?: string
@@ -361,7 +369,14 @@ async liberarBloqueosMultiples(
 
   async registrarAbono(
     ventaId: string,
-    data: { monto: number; metodo_pago: string; notas?: string; boleta_id?: string; boletas_abono?: Array<{ boleta_id: string; monto: number }> }
+    data: {
+      monto: number
+      metodo_pago: string
+      notas?: string
+      boleta_id?: string
+      boletas_abono?: Array<{ boleta_id: string; monto: number }>
+      linea_venta_id?: string
+    }
   ) {
     // Validar y limpiar datos antes de enviar
     const montoNum = Number(data.monto)
@@ -393,6 +408,10 @@ async liberarBloqueosMultiples(
     else if (data.boleta_id) {
       payload.boleta_id = data.boleta_id
     }
+
+    if (data.linea_venta_id) {
+      payload.linea_venta_id = data.linea_venta_id
+    }
     
     return this.request<{
       message: string
@@ -406,21 +425,25 @@ async liberarBloqueosMultiples(
   // ============ RESERVAS ============
 
   async crearReserva(reservaData: ReservaRequest) {
+    const body: Record<string, unknown> = {
+      rifa_id: reservaData.rifa_id,
+      cliente: {
+        nombre: reservaData.cliente.nombre,
+        telefono: reservaData.cliente.telefono,
+        email: reservaData.cliente.email,
+        identificacion: reservaData.cliente.identificacion,
+        direccion: reservaData.cliente.direccion,
+      },
+      boletas: reservaData.boletas,
+      dias_bloqueo: reservaData.dias_bloqueo || 5,
+      notas: reservaData.notas,
+    }
+    if (reservaData.linea_venta_id) {
+      body.linea_venta_id = reservaData.linea_venta_id
+    }
     return this.request<ReservaResponse>(`/ventas/reservar`, {
       method: 'POST',
-      body: JSON.stringify({
-        rifa_id: reservaData.rifa_id,
-        cliente: {
-          nombre: reservaData.cliente.nombre,
-          telefono: reservaData.cliente.telefono,
-          email: reservaData.cliente.email,
-          identificacion: reservaData.cliente.identificacion,
-          direccion: reservaData.cliente.direccion
-        },
-        boletas: reservaData.boletas,
-        dias_bloqueo: reservaData.dias_bloqueo || 5,
-        notas: reservaData.notas
-      })
+      body: JSON.stringify(body),
     })
   }
 

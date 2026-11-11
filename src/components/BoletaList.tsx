@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Boleta } from '@/types/boleta'
 import type { Rifa } from '@/types/rifa'
@@ -10,9 +10,11 @@ import { downloadBoletaFromElement } from '@/utils/downloadBoletaImage'
 import {
   BOLETA_BADGE_STYLES,
   BOLETA_BODY_TEXT,
+  BOLETA_BONO_HTML,
   BOLETA_LEFT_STYLE,
   BOLETA_NUMERO_STYLE,
   BOLETA_PRECIO_STYLE,
+  BOLETA_RULES_HTML,
   BOLETA_TICKET_STYLE,
 } from '@/constants/boletaTheme'
 import {
@@ -23,6 +25,8 @@ import {
   boletaHeightForImage,
 } from '@/constants/boletaDimensions'
 import { formatBoletaNumeros, searchMatchesNumeros, normalizeNumeros, getPrincipalGift, sanitizeBoletaSearchDigits } from '@/utils/formatBoletaNumeros'
+import BoletaOpcionesMenu from '@/components/boletas/BoletaOpcionesMenu'
+import BoletaFiltroStatCard from '@/components/boletas/BoletaFiltroStatCard'
 
 /** Quita acentos para comparar nombres (José ≈ Jose). */
 function normalizeText(value: string): string {
@@ -107,8 +111,67 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
   const [savingNota, setSavingNota] = useState(false)
   const [notasLocales, setNotasLocales] = useState<Record<string, string | null>>({})
   const [vistaModo, setVistaModo] = useState<'tabla' | 'grilla'>('tabla')
+  const [menuBoleta, setMenuBoleta] = useState<Boleta | null>(null)
+  const [menuAnchorEl, setMenuAnchorEl] = useState<HTMLElement | null>(null)
+  const [isDesktop, setIsDesktop] = useState(false)
+  const [filtrosMobileOpen, setFiltrosMobileOpen] = useState(false)
   const router = useRouter()
   const esDoble = Boolean(rifaInfo?.doble_oportunidad)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)')
+    const sync = () => setIsDesktop(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
+
+  const openMenu = (boleta: Boleta, anchor: HTMLElement | null) => {
+    setMenuAnchorEl(anchor)
+    setMenuBoleta(boleta)
+  }
+
+  const closeMenu = () => {
+    setMenuBoleta(null)
+    setMenuAnchorEl(null)
+  }
+
+  const renderAccionesBoleta = (boleta: Boleta, compact = false) => {
+    const btnClass = compact
+      ? 'p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200'
+      : 'text-slate-600 hover:text-blue-600 transition-colors p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-slate-100'
+
+    return (
+      <div className={`flex items-center shrink-0 ${compact ? 'gap-0.5' : 'gap-1 justify-end'}`}>
+        <button
+          type="button"
+          onClick={() => router.push(`/boletas/${boleta.id}`)}
+          className={btnClass}
+          title="Ver detalle"
+          aria-label={`Ver boleta ${formatBoletaNumeros(boleta.numeros, boleta.numero)}`}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={(e) => openMenu(boleta, e.currentTarget)}
+          className={btnClass}
+          title="Más opciones"
+          aria-label={`Opciones boleta ${formatBoletaNumeros(boleta.numeros, boleta.numero)}`}
+          aria-haspopup="dialog"
+        >
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <circle cx="12" cy="5" r="1.75" />
+            <circle cx="12" cy="12" r="1.75" />
+            <circle cx="12" cy="19" r="1.75" />
+          </svg>
+        </button>
+      </div>
+    )
+  }
 
   // Determina label y clases del estado según la boleta
   const getEstadoInfo = (boleta: Boleta) => {
@@ -375,27 +438,32 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
 
         const esReservada = estadoNorm === 'RESERVADA'
         const esCancelada = estadoNorm === 'ANULADA' || estadoNorm === 'CANCELADA'
-        const esPagada = ['CON_PAGO', 'PAGADA', 'PAGADO', 'VENDIDA'].includes(estadoNorm) && tieneCliente
+        const pagadoWords = ['CON_PAGO', 'PAGADA', 'PAGADO', 'VENDIDA']
+        const esPagada = pagadoWords.includes(estadoNorm) && tieneCliente
         const esAbonada = estadoNorm === 'ABONADA'
+        const fin = financieroMap[boleta.id]
+        const saldoFin = fin ? fin.saldo_pendiente : null
+        const bonoCancelado =
+          tieneCliente &&
+          (pagadoWords.includes(estadoNorm) ||
+            (typeof saldoFin === 'number' && saldoFin <= 0 && !esReservada && !esAbonada && !esCancelada))
 
-        const labelCss = 'font-size:7px;letter-spacing:0.08em;text-transform:uppercase;color:#a3a3a3;margin-top:4px;text-align:center;width:100%;'
         let estadoHTML = ''
         if (esCancelada) {
-          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.cancelada}">Boleta cancelada</div><p style="${BOLETA_BODY_TEXT};margin-top:4px;color:#a3a3a3;">Esta boleta no tiene validez</p>`
+          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.cancelada}">BOLETA CANCELADA</div><p style="${BOLETA_BODY_TEXT};font-weight:700;">Esta boleta no tiene validez</p>`
         } else if (esReservada && tieneCliente) {
-          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.reservada}">Reservada</div><p style="${labelCss}">A nombre de</p><p style="${BOLETA_BODY_TEXT};color:#f5f5f5;">${boleta.cliente_info?.nombre ?? '—'}</p><p style="${BOLETA_BODY_TEXT};color:#a3a3a3;">CC. ${boleta.cliente_info?.identificacion ?? '—'}</p><p style="${BOLETA_BODY_TEXT};color:#a3a3a3;margin-top:4px;">Hasta: ${reservadaHastaFmt ?? '—'}</p>`
+          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.reservada}">RESERVADA</div><div style="${BOLETA_BODY_TEXT}"><p style="margin:0">A nombre de:</p><p style="margin:0;font-weight:700">${boleta.cliente_info?.nombre ?? '—'}</p><p style="margin:0">CC. ${boleta.cliente_info?.identificacion ?? '—'}</p></div>`
         } else if (esReservada && !tieneCliente) {
-          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.bloqueada}">Bloqueada</div><p style="${BOLETA_BODY_TEXT};margin-top:4px;color:#a3a3a3;">Boleta bloqueada momentáneamente</p>`
+          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.bloqueada}">BLOQUEADA</div><p style="${BOLETA_BODY_TEXT}">Boleta bloqueada momentáneamente</p>`
         } else if (esPagada) {
-          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.pagada}">Pagada</div><p style="${labelCss}">A nombre de</p><p style="${BOLETA_BODY_TEXT};color:#f5f5f5;">${boleta.cliente_info?.nombre ?? '—'}</p><p style="${BOLETA_BODY_TEXT};color:#a3a3a3;">CC. ${boleta.cliente_info?.identificacion ?? '—'}</p>`
+          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.pagada}">PAGADA</div><div style="${BOLETA_BODY_TEXT}"><p style="margin:0">A nombre de:</p><p style="margin:0;font-weight:700">${boleta.cliente_info?.nombre ?? '—'}</p><p style="margin:0">CC. ${boleta.cliente_info?.identificacion ?? '—'}</p></div>`
         } else if (esAbonada) {
-          const fin = financieroMap[boleta.id]
-          const abonado = fin ? fin.total_pagado : 0
           const saldo = fin ? fin.saldo_pendiente : (precioNum ? precioNum : 0)
-          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.abonada}">Abonada</div><p style="${BOLETA_BODY_TEXT};color:#d4af37;font-weight:700;margin-top:4px;">Deuda: $${saldo.toLocaleString('es-CO')}</p><p style="${labelCss}">A nombre de</p><p style="${BOLETA_BODY_TEXT};color:#f5f5f5;">${boleta.cliente_info?.nombre ?? '—'}</p><p style="${BOLETA_BODY_TEXT};color:#a3a3a3;">CC. ${boleta.cliente_info?.identificacion ?? '—'}</p>${fin ? `<p style="${BOLETA_BODY_TEXT};color:#6ee7b7;font-weight:600;">Abonado: $${abonado.toLocaleString('es-CO')}</p>` : ''}`
+          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.abonada}">ABONADA</div><p style="${BOLETA_BODY_TEXT};font-weight:700;color:#b45309">Deuda: $${saldo.toLocaleString('es-CO')}</p><div style="${BOLETA_BODY_TEXT}"><p style="margin:0">A nombre de:</p><p style="margin:0;font-weight:700">${boleta.cliente_info?.nombre ?? '—'}</p><p style="margin:0">CC. ${boleta.cliente_info?.identificacion ?? '—'}</p></div>`
         } else {
-          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.disponible}">Disponible</div>`
+          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.disponible}">DISPONIBLE</div>`
         }
+        void reservadaHastaFmt
 
         const qrSrc = boleta.qr_url || ''
         const { principal, gift, ordered } = getPrincipalGift(
@@ -407,50 +475,33 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
           gift != null
             ? `Principal #${String(principal).padStart(4, '0')} · Regalo #${String(gift).padStart(4, '0')}`
             : `Principal #${String(principal ?? boleta.numero).padStart(4, '0')}`
-        const numsHtml = `
-          <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
-            <div style="display:grid;justify-items:center;width:100%;padding:5px;border-radius:6px;border:1px solid rgba(243,196,93,0.5);background:rgba(212,175,55,0.09);">
-              <span style="color:#e7e5e4;font-size:7.5px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;">Número principal</span>
-              <strong style="color:#f3c45d;font-size:1.18rem;font-weight:800;letter-spacing:0.08em;font-family:ui-monospace,Menlo,monospace;">#${String(principal ?? 0).padStart(4, '0')}</strong>
-            </div>
-            ${
-              gift != null
-                ? `<div style="width:20px;height:20px;margin:-4px 0;display:grid;place-items:center;border-radius:50%;background:#16120a;border:1px solid rgba(243,196,93,0.45);box-shadow:0 0 0 3px #0e0e0e;color:#f3c45d;font-size:12px;font-weight:900;">+</div>
-                  <div style="display:grid;justify-items:center;width:100%;padding:5px;border-radius:6px;border:1px dashed rgba(110,231,183,0.52);background:rgba(16,185,129,0.08);">
-                    <span style="color:#e7e5e4;font-size:7.5px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;">🎁 Número de regalo</span>
-                    <strong style="color:#6ee7b7;font-size:1.18rem;font-weight:800;letter-spacing:0.08em;font-family:ui-monospace,Menlo,monospace;">#${String(gift).padStart(4, '0')}</strong>
-                    <span style="margin-top:2px;color:#a7f3d0;font-size:6px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;white-space:nowrap;">Incluido gratis · otro número de 4 cifras</span>
-                  </div>`
-                : ''
-            }
-          </div>`
-        const numPad = String(principal ?? boleta.numero).padStart(4, '0')
+        const numsHtml = `<div style="${BOLETA_NUMERO_STYLE}">#${String(principal ?? 0).padStart(4, '0')}</div>${
+          gift != null
+            ? `<div style="font-size:11px;font-weight:700;color:#333;margin-top:2px;text-align:center;">+ #${String(gift).padStart(4, '0')}</div>`
+            : ''
+        }`
         void ordered
+        void numsLabel
 
-        // Usar la imagen data URL pre-cargada (sin CORS, instantáneo)
         const rightContent = imagenDataUrl
-          ? `<img src="${imagenDataUrl}" style="width:100%;height:100%;object-fit:fill;display:block;" />`
-          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0a0a0a,#151515);"><div style="text-align:center;"><p style="font-size:20px;font-weight:700;color:#d4af37;">${rifaInfo?.nombre || 'Proyecto'}</p><p style="color:#a3a3a3;">${numsLabel}</p></div></div>`
+          ? `<img src="${imagenDataUrl}" style="width:100%;height:100%;object-fit:cover;display:block;" />`
+          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f5f5f5;text-align:center;color:#111;"><div><p style="font-weight:700">${rifaInfo?.nombre || 'Proyecto'}</p><p>#${String(principal ?? boleta.numero).padStart(4, '0')}</p></div></div>`
 
         container.innerHTML = `
-          <div class="boleta-ticket" style="${BOLETA_TICKET_STYLE}width:${BOLETA_WIDTH}px;height:${ticketHeight}px;">
+          <div class="boleta-ticket boleta-ticket--oficial" style="${BOLETA_TICKET_STYLE}width:${BOLETA_WIDTH}px;height:${ticketHeight}px;">
             <div style="${BOLETA_LEFT_STYLE}width:${BOLETA_LEFT_WIDTH}px;height:${ticketHeight}px;">
-              <div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;width:100%;">
-                <div style="${BOLETA_BODY_TEXT}">
-                  ${estadoHTML}
-                </div>
+              ${BOLETA_RULES_HTML}
+              ${estadoHTML}
+              <div style="display:flex;justify-content:center;width:100%;">
+                <img src="${qrSrc}" style="width:72px;height:72px;padding:3px;background:#fff;border:1px solid #111;" alt="QR" />
               </div>
-              <div style="display:flex;justify-content:center;margin-bottom:4px;width:100%;">
-                <img src="${qrSrc}" style="width:72px;height:72px;padding:3px;background:#fff;border-radius:4px;border:1px solid rgba(201,162,39,0.45);" alt="QR" />
-              </div>
-              ${(() => { const n = getNotaBoleta(boleta); return n ? `<div style="text-align:center;font-size:8px;font-style:italic;color:#737373;max-height:24px;overflow:hidden;line-height:1.25;width:100%;">${n}</div>` : ''; })()}
-              <div style="width:100%;">
-                <div style="${BOLETA_NUMERO_STYLE}">${numsHtml}</div>
-                ${precioNum ? `<div style="${BOLETA_PRECIO_STYLE}">$${precioNum.toLocaleString('es-CO')}</div>` : ''}
-              </div>
+              ${(() => { const n = getNotaBoleta(boleta); return n ? `<div style="text-align:center;font-size:7px;color:#555;width:100%;">${n}</div>` : ''; })()}
+              ${numsHtml}
+              ${precioNum ? `<div style="${BOLETA_PRECIO_STYLE}">$${precioNum.toLocaleString('es-CO')}</div>` : ''}
             </div>
-            <div style="flex-shrink:0;height:100%;width:${BOLETA_RIGHT_WIDTH}px;">
+            <div style="flex-shrink:0;position:relative;overflow:hidden;height:${ticketHeight}px;width:${BOLETA_RIGHT_WIDTH}px;">
               ${rightContent}
+              ${BOLETA_BONO_HTML(bonoCancelado)}
             </div>
           </div>
         `
@@ -554,66 +605,67 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
       </div> */}
 
       {/* Cards de Resumen - Clickeables como Filtros */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <button
-          onClick={() => { setFiltroEstado(filtroEstado === 'DISPONIBLE' ? null : 'DISPONIBLE'); setCurrentPage(1) }}
-          className={`bg-white rounded-xl shadow-sm border p-5 flex items-center gap-4 border-l-4 border-l-emerald-400 transition-all cursor-pointer text-left w-full ${
-            filtroEstado === 'DISPONIBLE' ? 'ring-2 ring-emerald-400 bg-emerald-50 border-emerald-300' : 'border-slate-200 hover:shadow-md hover:border-emerald-300'
-          }`}
-        >
-          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          </div>
-          <div>
-            <p className="text-sm text-black font-semibold">Disponibles</p>
-            <p className="text-2xl font-bold text-black">{stats.disponibles}</p>
-          </div>
-        </button>
-
-        <button
-          onClick={() => { setFiltroEstado(filtroEstado === 'VENDIDAS' ? null : 'VENDIDAS'); setCurrentPage(1) }}
-          className={`bg-white rounded-xl shadow-sm border p-5 flex items-center gap-4 border-l-4 border-l-green-600 transition-all cursor-pointer text-left w-full ${
-            filtroEstado === 'VENDIDAS' ? 'ring-2 ring-green-500 bg-green-50 border-green-300' : 'border-slate-200 hover:shadow-md hover:border-green-300'
-          }`}
-        >
-          <div className="p-3 bg-green-50 text-green-700 rounded-lg">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          </div>
-          <div>
-            <p className="text-sm text-black font-semibold">Vendidas</p>
-            <p className="text-2xl font-bold text-black">{stats.vendidas}</p>
-          </div>
-        </button>
-
-        <button
-          onClick={() => { setFiltroEstado(filtroEstado === 'RESERVADAS' ? null : 'RESERVADAS'); setCurrentPage(1) }}
-          className={`bg-white rounded-xl shadow-sm border p-5 flex items-center gap-4 border-l-4 border-l-blue-500 transition-all cursor-pointer text-left w-full ${
-            filtroEstado === 'RESERVADAS' ? 'ring-2 ring-blue-500 bg-blue-50 border-blue-300' : 'border-slate-200 hover:shadow-md hover:border-blue-300'
-          }`}
-        >
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-          </div>
-          <div>
-            <p className="text-sm text-black font-semibold">Reservadas</p>
-            <p className="text-2xl font-bold text-black">{stats.reservadas}</p>
-          </div>
-        </button>
-
-        <button
-          onClick={() => { setFiltroEstado(filtroEstado === 'ABONADAS' ? null : 'ABONADAS'); setCurrentPage(1) }}
-          className={`bg-white rounded-xl shadow-sm border p-5 flex items-center gap-4 border-l-4 border-l-orange-400 transition-all cursor-pointer text-left w-full ${
-            filtroEstado === 'ABONADAS' ? 'ring-2 ring-orange-400 bg-orange-50 border-orange-300' : 'border-slate-200 hover:shadow-md hover:border-orange-300'
-          }`}
-        >
-          <div className="p-3 bg-orange-50 text-orange-500 rounded-lg">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          </div>
-          <div>
-            <p className="text-sm text-black font-semibold">Abonadas</p>
-            <p className="text-2xl font-bold text-black">{stats.abonadas}</p>
-          </div>
-        </button>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4 min-w-0">
+        <BoletaFiltroStatCard
+          label="Disponibles"
+          count={stats.disponibles}
+          active={filtroEstado === 'DISPONIBLE'}
+          accent="emerald"
+          onClick={() => {
+            setFiltroEstado(filtroEstado === 'DISPONIBLE' ? null : 'DISPONIBLE')
+            setCurrentPage(1)
+          }}
+          icon={
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+        />
+        <BoletaFiltroStatCard
+          label="Vendidas"
+          count={stats.vendidas}
+          active={filtroEstado === 'VENDIDAS'}
+          accent="green"
+          onClick={() => {
+            setFiltroEstado(filtroEstado === 'VENDIDAS' ? null : 'VENDIDAS')
+            setCurrentPage(1)
+          }}
+          icon={
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+        />
+        <BoletaFiltroStatCard
+          label="Reservadas"
+          count={stats.reservadas}
+          active={filtroEstado === 'RESERVADAS'}
+          accent="blue"
+          onClick={() => {
+            setFiltroEstado(filtroEstado === 'RESERVADAS' ? null : 'RESERVADAS')
+            setCurrentPage(1)
+          }}
+          icon={
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          }
+        />
+        <BoletaFiltroStatCard
+          label="Abonadas"
+          count={stats.abonadas}
+          active={filtroEstado === 'ABONADAS'}
+          accent="orange"
+          onClick={() => {
+            setFiltroEstado(filtroEstado === 'ABONADAS' ? null : 'ABONADAS')
+            setCurrentPage(1)
+          }}
+          icon={
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+        />
       </div>
 
       {/* Filtro activo indicator */}
@@ -630,22 +682,40 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
       )}
 
       {/* Buscador y Controles */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-        <div className="flex flex-col lg:flex-row gap-4 justify-between items-center">
-          <div className="w-full lg:w-2/3 relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" /></svg>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5">
+        <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 justify-between items-stretch lg:items-center">
+          <div className="w-full lg:w-2/3 flex gap-2">
+            <div className="relative flex-1 min-w-0">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" /></svg>
+              </div>
+              <input
+                type="search"
+                inputMode="search"
+                placeholder="Buscar por nombre, cédula o número..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className="w-full pl-10 pr-4 py-3 min-h-[48px] border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-shadow text-black bg-white placeholder:text-slate-500 text-base"
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Buscar por nombre, cédula o número de boleta..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value)
-                setCurrentPage(1)
-              }}
-              className="w-full pl-10 pr-4 py-2.5 border border-slate-400 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-shadow text-black bg-white focus:bg-white placeholder:text-slate-500"
-            />
+            <button
+              type="button"
+              onClick={() => setFiltrosMobileOpen((v) => !v)}
+              className={`lg:hidden shrink-0 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl border ${
+                filtroEstado || filtrosMobileOpen
+                  ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                  : 'border-slate-300 bg-white text-slate-600'
+              }`}
+              aria-label="Filtros por estado"
+              aria-expanded={filtrosMobileOpen}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+            </button>
           </div>
 
           <div className="flex items-center gap-3 w-full lg:w-auto">
@@ -691,13 +761,38 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
       </div>
 
       {/* Resumen de Resultados */}
-      <div className="flex justify-between items-center px-1">
+      <div className="flex flex-wrap justify-between items-center gap-3 px-1">
         <div className="text-sm text-slate-600">
-          Mostrando <span className="font-semibold text-slate-900">{startIndex}</span> a <span className="font-semibold text-slate-900">{endIndex}</span> de <span className="font-semibold text-slate-900">{filteredBoletas.length}</span>
+          <span className="font-semibold text-slate-900">{startIndex}</span>
+          {' – '}
+          <span className="font-semibold text-slate-900">{endIndex}</span>
+          {' de '}
+          <span className="font-semibold text-slate-900">{filteredBoletas.length}</span>
           {filteredBoletas.length !== boletas.length && (
-            <span className="ml-1 text-slate-500">(filtradas de {boletas.length} totales)</span>
+            <span className="ml-1 text-slate-500 hidden sm:inline">(filtradas de {boletas.length})</span>
           )}
         </div>
+        {vistaModo === 'tabla' && (
+          <div className="flex items-center gap-2 lg:hidden text-sm text-slate-600">
+            <label htmlFor="itemsPerPageMobile" className="font-medium whitespace-nowrap">
+              Mostrar:
+            </label>
+            <select
+              id="itemsPerPageMobile"
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value))
+                setCurrentPage(1)
+              }}
+              className="px-2 py-1.5 min-h-[40px] border border-slate-300 rounded-lg text-slate-900 bg-white text-sm"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+        )}
         {(searchTerm || filtroEstado) && (
           <button
             onClick={() => { setSearchTerm(''); setFiltroEstado(null); setCurrentPage(1) }}
@@ -774,9 +869,54 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
         </div>
       )}
 
-      {/* Tabla de Boletas */}
+      {/* Lista compacta (móvil / tablet) */}
       {(!esDoble || vistaModo === 'tabla') && (
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="lg:hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          {paginatedBoletas.length === 0 ? (
+            <div className="px-4 py-14 text-center text-slate-500 text-sm">
+              {searchTerm ? 'No hay resultados para tu búsqueda.' : 'Aún no hay boletas en este proyecto.'}
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {paginatedBoletas.map((boleta) => {
+                const estado = getEstadoInfo(boleta)
+                const asignado =
+                  boleta.cliente_info?.nombre ||
+                  boleta.inventario_info?.nombre ||
+                  'Sin asignar'
+                const numeroFmt = formatBoletaNumeros(boleta.numeros, boleta.numero)
+                return (
+                  <li key={boleta.id} className="flex items-center gap-2 px-2 sm:px-3 py-2.5 min-h-[60px]">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(boleta.id)}
+                      onChange={() => toggleSelect(boleta.id)}
+                      className="w-4 h-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      aria-label={`Seleccionar boleta ${numeroFmt}`}
+                    />
+                    <div className="flex-1 min-w-0 pr-1">
+                      <p className="font-mono font-bold text-slate-900 text-sm leading-tight truncate">
+                        #{numeroFmt}
+                      </p>
+                      <p className="text-xs text-slate-500 truncate italic mt-0.5">{asignado}</p>
+                    </div>
+                    <span
+                      className={`shrink-0 max-w-[88px] text-center inline-flex px-2 py-1 text-[10px] sm:text-xs font-bold rounded-full leading-tight ${estado.classes}`}
+                    >
+                      {estado.label}
+                    </span>
+                    {renderAccionesBoleta(boleta, true)}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* Tabla de Boletas (escritorio) */}
+      {(!esDoble || vistaModo === 'tabla') && (
+      <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50/80 border-b border-slate-200">
@@ -923,15 +1063,8 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
                           <span className="text-slate-400 text-xs italic">N/A</span>
                         )}
                       </td> */}
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end space-x-3 opacity-100 sm:opacity-100 sm:group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => router.push(`/boletas/${boleta.id}`)} className="text-slate-600 hover:text-blue-600 transition-colors p-1" title="Ver Detalle">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                          </button>
-                          <button onClick={() => router.push(`/boletas/${boleta.id}/print`)} className="text-slate-600 hover:text-green-600 transition-colors p-1" title="Imprimir">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                          </button>
-                        </div>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        {renderAccionesBoleta(boleta, false)}
                       </td>
                     </tr>
                   )
@@ -965,6 +1098,23 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
             <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} className="px-3 py-1.5 text-sm font-medium rounded-md hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent text-slate-700 transition-colors">Siguiente</button>
           </div>
         </div>
+      )}
+
+      {menuBoleta && (
+        <BoletaOpcionesMenu
+          open
+          onClose={closeMenu}
+          boleta={menuBoleta}
+          rifaInfo={rifaInfo}
+          estadoInfo={getEstadoInfo(menuBoleta)}
+          onVerDetalle={() => router.push(`/boletas/${menuBoleta.id}`)}
+          onImprimir={() => router.push(`/boletas/${menuBoleta.id}/print`)}
+          onEditarNota={() => handleEditNota(menuBoleta)}
+          rifaId={rifaInfo?.id ?? null}
+          onIrAVender={(href) => router.push(href)}
+          mode={isDesktop ? 'popover' : 'sheet'}
+          anchorEl={menuAnchorEl}
+        />
       )}
 
     </div>

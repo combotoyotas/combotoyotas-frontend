@@ -125,10 +125,10 @@ export default function FiltersBar({
   };
 
   const chipBase =
-    'shrink-0 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold uppercase tracking-wide transition-colors border-[1.5px] border-black min-h-[40px]';
+    'shrink-0 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-xl transition-colors border border-slate-200 min-h-[40px]';
 
   return (
-    <div className="bg-[var(--surface-elevated)] border-[1.5px] border-black shadow-[4px_4px_0_#101010] p-3 sm:p-5 lg:p-6 mb-5 sm:mb-6 flex flex-col gap-4 sm:gap-5 overflow-hidden min-w-0">
+    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-3 sm:p-5 lg:p-6 mb-5 sm:mb-6 flex flex-col gap-4 sm:gap-5 overflow-hidden min-w-0">
       <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 sm:gap-5 min-w-0">
         <div className="flex flex-col gap-2 min-w-0 flex-1 w-full">
           <label className="text-[10px] sm:text-sm font-bold uppercase tracking-[0.08em] text-slate-500">
@@ -136,7 +136,7 @@ export default function FiltersBar({
           </label>
           <div className="relative min-w-0">
             <select
-              className="appearance-none bg-[var(--surface)] border-[1.5px] border-black text-slate-900 text-sm sm:text-base font-medium block w-full px-3 sm:px-4 py-2.5 pr-10 outline-none cursor-pointer min-w-0"
+              className="appearance-none bg-white border border-slate-200 text-slate-900 text-sm sm:text-base font-medium block w-full px-3 sm:px-4 py-2.5 pr-10 outline-none cursor-pointer min-w-0"
               value={selectedRifa || ''}
               onChange={(e) => setSelectedRifa(e.target.value)}
             >
@@ -163,28 +163,28 @@ export default function FiltersBar({
               <button
                 type="button"
                 onClick={() => setDatePreset(null)}
-                className={`${chipBase} ${isPresetTodo ? 'bg-[var(--primary)] text-black' : 'bg-[var(--surface)] text-slate-700'}`}
+                className={`${chipBase} ${isPresetTodo ? 'bg-indigo-600 text-white' : 'bg-white text-slate-700'}`}
               >
                 Todo
               </button>
               <button
                 type="button"
                 onClick={() => setDatePreset(0)}
-                className={`${chipBase} ${isPresetHoy ? 'bg-[var(--primary)] text-black' : 'bg-[var(--surface)] text-slate-700'}`}
+                className={`${chipBase} ${isPresetHoy ? 'bg-indigo-600 text-white' : 'bg-white text-slate-700'}`}
               >
                 Hoy
               </button>
               <button
                 type="button"
                 onClick={() => setDatePreset(7)}
-                className={`${chipBase} ${isPreset7 ? 'bg-[var(--primary)] text-black' : 'bg-[var(--surface)] text-slate-700'}`}
+                className={`${chipBase} ${isPreset7 ? 'bg-indigo-600 text-white' : 'bg-white text-slate-700'}`}
               >
                 7 Días
               </button>
               <button
                 type="button"
                 onClick={() => setDatePreset(30)}
-                className={`${chipBase} ${isPreset30 ? 'bg-[var(--primary)] text-black' : 'bg-[var(--surface)] text-slate-700'}`}
+                className={`${chipBase} ${isPreset30 ? 'bg-indigo-600 text-white' : 'bg-white text-slate-700'}`}
               >
                 30 Días
               </button>
@@ -197,7 +197,7 @@ export default function FiltersBar({
                   type="date"
                   value={fechaInicio}
                   onChange={(e) => setFechaInicio(e.target.value)}
-                  className="w-full min-w-0 bg-[var(--surface)] border-[1.5px] border-black text-slate-800 text-sm px-3 py-2 outline-none"
+                  className="w-full min-w-0 bg-white border border-slate-200 text-slate-800 text-sm px-3 py-2 outline-none"
                 />
               </label>
               <label className="flex flex-col gap-1 min-w-0">
@@ -206,7 +206,7 @@ export default function FiltersBar({
                   type="date"
                   value={fechaFin}
                   onChange={(e) => setFechaFin(e.target.value)}
-                  className="w-full min-w-0 bg-[var(--surface)] border-[1.5px] border-black text-slate-800 text-sm px-3 py-2 outline-none"
+                  className="w-full min-w-0 bg-white border border-slate-200 text-slate-800 text-sm px-3 py-2 outline-none"
                 />
               </label>
             </div>
@@ -217,7 +217,7 @@ export default function FiltersBar({
       {esSuperAdmin && (
         <div className="border-t-[1.5px] border-black pt-4 sm:pt-5 flex flex-col gap-3 sm:gap-4 min-w-0">
           <label className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-wider text-black bg-[var(--primary)] border-[1.5px] border-black px-2 py-0.5">
+            <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-wider text-black bg-[var(--primary)] border border-slate-200 px-2 py-0.5">
               Super Admin
             </span>
             <span className="text-[10px] sm:text-sm font-bold uppercase tracking-[0.08em] text-slate-500">
@@ -246,8 +246,8 @@ export default function FiltersBar({
                 }
                 className={`${chipBase} ${idx > 0 ? '' : ''} ${
                   personFilter.tipo === opt.tipo
-                    ? 'bg-[var(--primary)] text-black'
-                    : 'bg-[var(--surface)] text-slate-700'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-white text-slate-700'
                 }`}
               >
                 {opt.label}
@@ -264,7 +264,7 @@ export default function FiltersBar({
                   {errorUsuarios || 'No hay admins activos registrados.'}
                 </p>
               ) : (
-                <div className="border-[1.5px] border-black bg-white max-h-52 sm:max-h-56 overflow-y-auto overscroll-contain">
+                <div className="border border-slate-200 bg-white max-h-52 sm:max-h-56 overflow-y-auto overscroll-contain">
                   {admins.map((v) => {
                     const selected = personFilter.vendedorId === v.id;
                     return (
@@ -272,10 +272,10 @@ export default function FiltersBar({
                         key={v.id}
                         type="button"
                         onClick={() => setPersonFilter({ tipo: 'ADMIN', vendedorId: v.id })}
-                        className={`w-full text-left px-3 py-3 sm:py-2.5 text-sm border-b-[1.5px] border-black last:border-b-0 transition-colors min-h-[48px] ${
+                        className={`w-full text-left px-3 py-3 sm:py-2.5 text-sm border-b border-slate-200 last:border-b-0 transition-colors min-h-[48px] ${
                           selected
-                            ? 'bg-[var(--primary)] text-black font-bold'
-                            : 'text-slate-800 hover:bg-[var(--surface)]'
+                            ? 'bg-indigo-600 text-white font-bold'
+                            : 'text-slate-800 hover:bg-white'
                         }`}
                       >
                         <span className="block leading-tight truncate">{v.nombre || v.email}</span>
@@ -301,7 +301,7 @@ export default function FiltersBar({
                   {errorUsuarios || 'No hay vendedores activos.'}
                 </p>
               ) : (
-                <div className="border-[1.5px] border-black bg-white max-h-52 sm:max-h-56 overflow-y-auto overscroll-contain">
+                <div className="border border-slate-200 bg-white max-h-52 sm:max-h-56 overflow-y-auto overscroll-contain">
                   {soloVendedores.map((v) => {
                     const selected = personFilter.vendedorId === v.id;
                     return (
@@ -309,10 +309,10 @@ export default function FiltersBar({
                         key={v.id}
                         type="button"
                         onClick={() => setPersonFilter({ tipo: 'VENDEDOR', vendedorId: v.id })}
-                        className={`w-full text-left px-3 py-3 sm:py-2.5 text-sm border-b-[1.5px] border-black last:border-b-0 transition-colors min-h-[48px] ${
+                        className={`w-full text-left px-3 py-3 sm:py-2.5 text-sm border-b border-slate-200 last:border-b-0 transition-colors min-h-[48px] ${
                           selected
-                            ? 'bg-[var(--primary)] text-black font-bold'
-                            : 'text-slate-800 hover:bg-[var(--surface)]'
+                            ? 'bg-indigo-600 text-white font-bold'
+                            : 'text-slate-800 hover:bg-white'
                         }`}
                       >
                         <span className="truncate block">{v.nombre || v.email}</span>
@@ -325,7 +325,7 @@ export default function FiltersBar({
           )}
 
           {personFilter.tipo !== 'TODOS' && (
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+            <p className="text-xs text-slate-400 leading-relaxed">
               {personFilter.tipo === 'ADMINS'
                 ? 'Ventas de todos los administradores.'
                 : personFilter.tipo === 'ADMIN'

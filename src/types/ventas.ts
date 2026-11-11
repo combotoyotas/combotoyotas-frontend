@@ -31,6 +31,7 @@ export interface BloqueoVerificacion {
 
 export interface Cliente {
   id?: string
+  codigo?: string
   nombre: string
   telefono: string
   email?: string
@@ -87,6 +88,7 @@ export interface VentaRequest {
     boleta_id: string
     monto: number
   }>
+  linea_venta_id?: string
 }
 
 export interface VentaResponse {
@@ -190,6 +192,7 @@ export interface ReservaRequest {
   boletas: Array<string | { id: string; numero_principal?: number | null }>
   dias_bloqueo?: number // Opcional, default 5
   notas?: string
+  linea_venta_id?: string
 }
 
 export interface BolataReservada {

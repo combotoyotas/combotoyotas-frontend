@@ -18,6 +18,8 @@ interface DialogoReservaProps {
   rifaId: string
   rifaNombre?: string
   fechaSorteo?: string | null
+  lineaVentaId?: string
+  requiereLinea?: boolean
   onClose: () => void
   onReservaCompletada: () => void
 }
@@ -37,6 +39,8 @@ export default function DialogoReserva({
   rifaId,
   rifaNombre,
   fechaSorteo,
+  lineaVentaId,
+  requiereLinea,
   onClose,
   onReservaCompletada
 }: DialogoReservaProps) {
@@ -115,6 +119,11 @@ export default function DialogoReserva({
       return
     }
 
+    if (requiereLinea && !lineaVentaId) {
+      setError('Selecciona la línea de venta en el carrito antes de reservar')
+      return
+    }
+
     setProcesando(true)
     setError(null)
     setPaso('procesando')
@@ -136,10 +145,14 @@ export default function DialogoReserva({
             : {}),
         })),
         dias_bloqueo: diasBloqueo,
-        notas: notas || undefined
+        notas: notas || undefined,
+        ...(lineaVentaId ? { linea_venta_id: lineaVentaId } : {}),
       }
       console.log('[DialogoReserva] Payload enviado:', JSON.stringify(reservaPayload, null, 2))
-      const respuesta = await ventasApi.crearReserva(reservaPayload)
+      const respuesta = await ventasApi.crearReserva({
+        ...reservaPayload,
+        linea_venta_id: lineaVentaId,
+      })
 
       setReservaResponse(respuesta.data)
       setPaso('completado')

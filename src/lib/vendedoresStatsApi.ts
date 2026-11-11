@@ -17,8 +17,47 @@ export interface VendedorStats {
   boletas_pagadas: number
   boletas_abonadas: number
   boletas_reservadas: number
+  boletas_libres?: number
   abonos_registrados: number
   abonos_monto: number
+  cuenta?: CuentaVendedor | null
+  cuenta_global?: CuentaVendedor | null
+}
+
+export interface CuentaLineaDesglose {
+  cantidad: number
+  cobrado: number
+  comision_vendedor: number
+  debe_organizacion: number
+  comision_porcentaje?: number
+}
+
+export interface CuentaPotencialLinea {
+  cantidad: number
+  valor_potencial: number
+}
+
+export interface CuentaDesgloseBoletas {
+  pagadas: CuentaLineaDesglose
+  abonadas: CuentaLineaDesglose
+  reservadas: CuentaPotencialLinea
+  libres: CuentaPotencialLinea
+}
+
+export interface CuentaVendedor {
+  cobrado_clientes: number
+  comision_vendedor: number
+  /** Saldo pendiente de entrega (= por_cobrar) */
+  debe_organizacion: number
+  /** Parte org. sobre cobrado, sin descontar liquidaciones */
+  parte_organizacion?: number
+  entregado_liquidaciones: number
+  entregado: number
+  por_cobrar: number
+  comision_porcentaje: number
+  admin_porcentaje: number
+  periodo?: boolean
+  desglose?: CuentaDesgloseBoletas
 }
 
 export interface ResumenGlobal {
@@ -42,6 +81,35 @@ export interface VendedorDetalleResumen {
   boletas_reservadas: number
   abonos_registrados: number
   abonos_monto: number
+  boletas_libres?: number
+  total_liquidado?: number
+  ganancia_estimada?: number
+  comision_porcentaje?: number
+  comision_abono_porcentaje?: number
+  cobrado_clientes?: number
+  debe_organizacion?: number
+  por_cobrar?: number
+  por_cobrar_global?: number
+  debe_organizacion_global?: number
+  entregado_global?: number
+  total_liquidado_periodo?: number
+}
+
+export interface BoletaLibreRow {
+  id: string
+  numero: number
+  estado: string
+  rifa_id: string
+  rifa_nombre: string
+}
+
+export interface LiquidacionRow {
+  id: string
+  monto: number
+  notas: string | null
+  created_at: string
+  registrado_por_nombre?: string
+  rifa_nombre?: string | null
 }
 
 export interface VendedorClienteRow {
@@ -100,11 +168,16 @@ export interface VendedorDetalleResponse {
     activo: boolean
     ultimo_login: string | null
     created_at: string
+    comision_porcentaje?: number
   }
   resumen: VendedorDetalleResumen
   clientes: VendedorClienteRow[]
   ventas: VendedorVentaRow[]
   boletas: VendedorBoletaRow[]
+  boletas_libres?: BoletaLibreRow[]
+  liquidaciones?: LiquidacionRow[]
+  cuenta?: CuentaVendedor | null
+  cuenta_global?: CuentaVendedor | null
 }
 
 export interface CrearUsuarioPayload {
@@ -112,6 +185,7 @@ export interface CrearUsuarioPayload {
   password: string
   rol: 'ADMIN' | 'VENDEDOR'
   email?: string
+  max_boletas_inventario?: number | null
 }
 
 export interface UsuarioCreado {
@@ -180,9 +254,27 @@ export const vendedoresStatsApi = {
     return handleResponse(res)
   },
 
+  async registrarLiquidacion(
+    vendedorId: string,
+    payload: { monto: number; rifa_id?: string; notas?: string }
+  ): Promise<{ success: boolean; data: LiquidacionRow }> {
+    const res = await fetch(`${API_BASE_URL}/api/vendedores-stats/${vendedorId}/liquidaciones`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    })
+    return handleResponse(res)
+  },
+
   async actualizarUsuario(
     id: string,
-    payload: { nombre?: string; email?: string; password?: string }
+    payload: {
+      nombre?: string
+      email?: string
+      password?: string
+      comision_porcentaje?: number
+      max_boletas_inventario?: number | null
+    }
   ): Promise<{ success: boolean; data: UsuarioCreado; message?: string }> {
     const res = await fetch(`${API_BASE_URL}/api/vendedores-stats/usuarios/${id}`, {
       method: 'PATCH',

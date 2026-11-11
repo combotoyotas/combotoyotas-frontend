@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { ventasApi } from '@/lib/ventasApi'
 import { BoletaEnCarrito, Cliente, VentaRequest } from '@/types/ventas'
@@ -14,6 +14,8 @@ import { WHATSAPP_VENTAS_ACTIVO } from '@/config/features'
 import { downloadBoletaImage } from '@/utils/downloadBoletaImage'
 import { formatBoletaNumeros } from '@/utils/formatBoletaNumeros'
 import PrincipalGiftLabel from '@/components/ventas/PrincipalGiftLabel'
+import { ajustesApi, type LineaVentaItem, type MedioPagoItem } from '@/lib/ajustesApi'
+import { TokenManager } from '@/utils/auth'
 
 const MEDIOS_PAGO_MAP: Record<string, string> = {
   'd397d917-c0d0-4c61-b2b3-2ebfab7deeb7': 'Efectivo',
@@ -61,6 +63,38 @@ export default function CarritoVentas({
   const [mostrarDialogoReserva, setMostrarDialogoReserva] = useState(false)
   const [reciboData, setReciboData] = useState<ReciboAbonoData | null>(null)
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false)
+  const [mediosPago, setMediosPago] = useState<MedioPagoItem[]>([])
+  const [lineasVenta, setLineasVenta] = useState<LineaVentaItem[]>([])
+  const [lineaVentaId, setLineaVentaId] = useState('')
+  const [esVendedor, setEsVendedor] = useState(false)
+  const [requiereLinea, setRequiereLinea] = useState(false)
+
+  useEffect(() => {
+    const user = TokenManager.getUser()
+    const rol = String(user?.rol || '').toUpperCase()
+    setEsVendedor(rol === 'VENDEDOR')
+    const needLinea = rol === 'VENDEDOR' || rol === 'ADMIN' || rol === 'SUPER_ADMIN'
+    setRequiereLinea(needLinea)
+    ajustesApi
+      .mediosParaVentas()
+      .then((m) => {
+        setMediosPago(m)
+        setMedioPagoId((prev) => (prev && m.some((x) => x.id === prev) ? prev : m[0]?.id || ''))
+      })
+      .catch(() => setMediosPago([]))
+    if (needLinea) {
+      ajustesApi
+        .lineasParaVentas()
+        .then((l) => {
+          setLineasVenta(l)
+          if (l.length === 1) setLineaVentaId(l[0].id)
+        })
+        .catch(() => setLineasVenta([]))
+    }
+  }, [])
+
+  const labelMedio = (id: string) =>
+    mediosPago.find((m) => m.id === id)?.nombre || MEDIOS_PAGO_MAP[id] || id
 
   // Calcular totales
   const subtotal = boletas.length * precioBoleta
@@ -109,6 +143,26 @@ export default function CarritoVentas({
       return
     }
 
+    if (esVendedor && tipoVenta !== 'RESERVA' && mediosPago.length === 0) {
+      setError('Configura al menos un medio de pago en Ajustes')
+      return
+    }
+
+    if (requiereLinea && tipoVenta !== null) {
+      if (lineasVenta.length === 0) {
+        setError(
+          esVendedor
+            ? 'Configura al menos una línea de venta en Ajustes'
+            : 'El super admin debe crear líneas de venta globales en Ajustes'
+        )
+        return
+      }
+      if (!lineaVentaId) {
+        setError('Selecciona la línea de venta (canal)')
+        return
+      }
+    }
+
     // Validaciones para abonos
     if (tipoVenta === 'ABONO') {
       if (montoAbono <= 0) {
@@ -152,6 +206,7 @@ export default function CarritoVentas({
         total_venta: total,
         total_pagado: tipoVenta === 'ABONO' ? montoAbono : total,
         notas: notas || undefined,
+        ...(lineaVentaId ? { linea_venta_id: lineaVentaId } : {}),
         ...(tipoVenta === 'ABONO' ? {
           abonos_por_boleta: boletas
             .filter(b => (abonosPorBoleta[b.id] || 0) > 0)
@@ -167,7 +222,7 @@ export default function CarritoVentas({
       
       // Generar datos para recibo
       const boletasResp = response.data?.boletas ?? []
-      const mpLabel = MEDIOS_PAGO_MAP[medioPagoId] || 'Otro'
+      const mpLabel = labelMedio(medioPagoId)
       const pagadoHoy = tipoVenta === 'ABONO' ? montoAbono : total
       setReciboData({
         tipo: tipoVenta === 'ABONO' ? 'venta_abono' : 'venta_nueva',
@@ -403,7 +458,7 @@ export default function CarritoVentas({
           <button
             onClick={() => {
               const boletasResp = ventaResponse?.boletas ?? []
-              const mpLabel = MEDIOS_PAGO_MAP[medioPagoId] || 'Otro'
+              const mpLabel = labelMedio(medioPagoId)
               const pagadoHoy = tipoVenta === 'ABONO' ? montoAbono : total
               setReciboData({
                 tipo: tipoVenta === 'ABONO' ? 'venta_abono' : 'venta_nueva',
@@ -683,11 +738,47 @@ export default function CarritoVentas({
             className="w-full px-4 py-2 border border-slate-400 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent bg-white text-black"
           >
             <option value="">Seleccionar método de pago</option>
-            <option value="d397d917-c0d0-4c61-b2b3-2ebfab7deeb7">Efectivo</option>
-            <option value="af6e15fc-c52c-4491-abe1-20243af301c4">Nequi</option>
-            <option value="daviplata">Daviplata</option>
-            <option value="db94562d-bb01-42a3-9414-6e369a1a70ba">PSE</option>
+            {mediosPago.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.nombre}
+              </option>
+            ))}
           </select>
+          {esVendedor && mediosPago.length === 0 && (
+            <p className="text-xs text-amber-700 mt-1">
+              Crea tus medios en <Link href="/ajustes" className="underline">Ajustes</Link>.
+            </p>
+          )}
+        </div>
+      )}
+
+      {requiereLinea && tipoVenta !== null && (
+        <div className="mb-6">
+          <label className="block text-sm font-bold text-black mb-2">Línea de venta</label>
+          <select
+            value={lineaVentaId}
+            onChange={(e) => setLineaVentaId(e.target.value)}
+            disabled={procesando}
+            className="w-full px-4 py-2 border border-slate-400 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white text-black"
+          >
+            <option value="">Seleccionar canal…</option>
+            {lineasVenta.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.nombre}
+              </option>
+            ))}
+          </select>
+          {lineasVenta.length === 0 && (
+            <p className="text-xs text-amber-700 mt-1">
+              {esVendedor ? (
+                <>
+                  Crea líneas en <Link href="/ajustes" className="underline">Ajustes</Link>.
+                </>
+              ) : (
+                'Pide al super admin que cree líneas globales en Ajustes.'
+              )}
+            </p>
+          )}
         </div>
       )}
 
@@ -768,7 +859,13 @@ export default function CarritoVentas({
         {tipoVenta === 'RESERVA' ? (
           <button
             onClick={() => setMostrarDialogoReserva(true)}
-            disabled={procesando || boletas.length === 0 || !cliente.nombre || !cliente.telefono}
+            disabled={
+              procesando ||
+              boletas.length === 0 ||
+              !cliente.nombre ||
+              !cliente.telefono ||
+              (requiereLinea && (!lineaVentaId || lineasVenta.length === 0))
+            }
             className="w-full sm:flex-1 px-4 py-3 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors min-h-[48px]"
           >
             {procesando ? 'Procesando...' : `📌 Crear Reserva`}
@@ -776,7 +873,18 @@ export default function CarritoVentas({
         ) : (
           <button
             onClick={() => setMostrarConfirmacion(true)}
-            disabled={!tipoVentaSeleccionado || procesando || boletas.length === 0 || !cliente.nombre || !cliente.telefono || !medioPagoId || (tipoVenta === 'ABONO' && montoAbono <= 0)}
+            disabled={
+              !tipoVentaSeleccionado ||
+              procesando ||
+              boletas.length === 0 ||
+              !cliente.nombre ||
+              !cliente.telefono ||
+              !medioPagoId ||
+              (tipoVenta === 'ABONO' && montoAbono <= 0) ||
+              (requiereLinea &&
+                (!lineaVentaId || lineasVenta.length === 0)) ||
+              (esVendedor && mediosPago.length === 0)
+            }
             className={`w-full sm:flex-1 px-4 py-3 sm:py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors min-h-[48px] ${
               tipoVenta === 'COMPLETA' 
                 ? 'bg-green-600 hover:bg-green-700' 
@@ -845,7 +953,7 @@ export default function CarritoVentas({
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-600">Método de pago:</span>
-                <span className="font-medium text-slate-900">{MEDIOS_PAGO_MAP[medioPagoId] || 'Efectivo'}</span>
+                <span className="font-medium text-slate-900">{labelMedio(medioPagoId)}</span>
               </div>
             </div>
             
@@ -882,6 +990,8 @@ export default function CarritoVentas({
         rifaNombre={rifaNombre}
         fechaSorteo={fechaSorteo}
         onClose={() => setMostrarDialogoReserva(false)}
+        lineaVentaId={lineaVentaId || undefined}
+        requiereLinea={requiereLinea}
         onReservaCompletada={() => {
           setMostrarDialogoReserva(false)
           onVentaCompletada()

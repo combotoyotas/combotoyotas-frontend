@@ -213,7 +213,15 @@ export default function ClienteDetalle({ clienteId, onBack }: ClienteDetalleProp
             </div>
             <div>
               <h2 className="text-2xl font-bold text-black">{cliente.nombre}</h2>
+              {cliente.codigo && (
+                <p className="text-slate-500 font-mono text-sm">Ficha: {cliente.codigo}</p>
+              )}
               <p className="text-slate-600">CC: {cliente.identificacion}</p>
+              {cliente.creado_por_etiqueta && (
+                <p className="text-xs font-semibold text-slate-500 mt-1">
+                  Registro creado por: {cliente.creado_por_etiqueta}
+                </p>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">

@@ -26,7 +26,7 @@ export default function CrearBoletasPage() {
   
   // Form fields for the new parameters
   const [formData, setFormData] = useState<BoletaGenerateRequest>({
-    qr_base_url: 'https://sueñosdorados.com.co/verificar/',
+    qr_base_url: 'https://rifasupertoyota.com.co/verificar/',
     imagen_url: '',
     diseño_template: 'modern',
     modo_pareo: 'manual',
@@ -135,13 +135,14 @@ export default function CrearBoletasPage() {
 
     try {
       const user = JSON.parse(userData)
-      setUserRole(user.rol)
-      
-      if (user.rol !== 'SUPER_ADMIN' && user.rol !== 'ADMIN' && user.rol !== 'VENDEDOR') {
-        router.push('/dashboard')
+      const rol = String(user.rol || '').toUpperCase()
+      setUserRole(rol)
+
+      if (rol !== 'SUPER_ADMIN') {
+        router.push('/boletas')
         return
       }
-      
+
       fetchRifas()
     } catch (error) {
       router.push('/login')
@@ -150,8 +151,12 @@ export default function CrearBoletasPage() {
 
   const fetchRifas = async () => {
     try {
-      const response = await rifaApi.getRifasOperativas('ACTIVA')
-      setRifas(response.data.filter(rifa => rifa.estado === 'ACTIVA'))
+      const response = await rifaApi.getRifas()
+      setRifas(
+        response.data.filter((rifa) =>
+          ['BORRADOR', 'ACTIVA', 'PAUSADA'].includes(rifa.estado)
+        )
+      )
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar proyectos')
@@ -322,17 +327,17 @@ export default function CrearBoletasPage() {
     setShowPreview(true)
   }
 
-  if (userRole && userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
+  if (userRole && userRole !== 'SUPER_ADMIN') {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-6 py-4 rounded-lg max-w-md">
           <h2 className="text-lg font-medium mb-2">Acceso Restringido</h2>
-          <p>Este módulo solo está disponible para usuarios con rol SUPER_ADMIN o ADMIN</p>
+          <p>Solo el super admin puede crear boletas.</p>
           <button
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push('/boletas')}
             className="mt-4 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800"
           >
-            Volver al Dashboard
+            Volver a Boletas
           </button>
         </div>
       </div>
@@ -402,7 +407,7 @@ export default function CrearBoletasPage() {
               </select>
               {rifas.length === 0 && (
                 <p className="mt-2 text-sm text-slate-500">
-                  No hay proyectos activas disponibles para generar boletas
+                  No hay proyectos en borrador, activos o pausados disponibles para generar boletas
                 </p>
               )}
             </div>
@@ -423,12 +428,12 @@ export default function CrearBoletasPage() {
                     id="qr_base_url"
                     value={formData.qr_base_url}
                     onChange={(e) => handleInputChange('qr_base_url', e.target.value)}
-                    placeholder="https://sueñosdorados.com.co/verificar/"
+                    placeholder="https://rifasupertoyota.com.co/verificar/"
                     className="w-full px-4 py-2 border border-slate-400 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none text-black bg-white"
                     disabled={creating}
                   />
                   <p className="mt-1 text-xs text-slate-500">
-                    URL donde el cliente verá el estado de su boleta al escanear el QR. Se admiten dominios con ñ (ej. sueñosdorados.com.co); el sistema los convierte automáticamente para el QR.
+                    URL donde el cliente verá el estado de su boleta al escanear el QR (ej. rifasupertoyota.com.co).
                   </p>
                 </div>
 
@@ -690,7 +695,7 @@ export default function CrearBoletasPage() {
             <p>• Cada boleta tendrá un código de barras único (formato: BOLETA-[rifa_id]-0001)</p>
             <p>• La imagen de plantilla se usará como fondo para todas las boletas</p>
             <p>• Solo puedes generar boletas una vez por proyecto</p>
-            <p>• El proyecto debe estar en estado "ACTIVA" para generar boletas</p>
+            <p>• Puedes generar boletas en borrador, activo o pausado (no en terminado)</p>
           </div>
         </div>
 

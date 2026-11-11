@@ -80,3 +80,18 @@ export const getVentasGeneral = async (
 
   return response.data;
 };
+
+export const getResumenVendedoresRifa = async (rifaId, fechaInicio, fechaFin) => {
+  const params = {};
+  if (fechaInicio && fechaFin) {
+    params.fechaInicio = fechaInicio;
+    params.fechaFin = fechaFin;
+  }
+  const token = localStorage.getItem('token');
+  const response = await axios.get(`${API_BASE_URL}/api/reportes/rifa/${rifaId}/vendedores`, {
+    params,
+    timeout: 30000,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return response.data;
+};

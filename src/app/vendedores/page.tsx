@@ -18,12 +18,7 @@ const fmtMoney = (n: number) =>
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
-const ROLE_BADGE: Record<string, string> = {
-  ADMIN: 'bg-emerald-100 text-emerald-700',
-  VENDEDOR: 'bg-amber-100 text-amber-700',
-}
-
-type GrupoFiltro = 'TODOS' | 'ADMINS' | 'VENDEDORES'
+type GrupoFiltro = 'ADMINS' | 'VENDEDORES'
 
 function sumMetrics(rows: VendedorStats[]): ResumenGlobal {
   return rows.reduce(
@@ -55,7 +50,7 @@ export default function VendedoresStatsPage() {
   const [data, setData] = useState<VendedorStats[]>([])
   const [fechaInicio, setFechaInicio] = useState('')
   const [fechaFin, setFechaFin] = useState('')
-  const [grupo, setGrupo] = useState<GrupoFiltro>('TODOS')
+  const [grupo, setGrupo] = useState<GrupoFiltro>('VENDEDORES')
   const [personaId, setPersonaId] = useState<string>('')
   const [search, setSearch] = useState('')
 
@@ -67,6 +62,7 @@ export default function VendedoresStatsPage() {
   const [formPassword, setFormPassword] = useState('')
   const [formRol, setFormRol] = useState<'ADMIN' | 'VENDEDOR'>('VENDEDOR')
   const [formEmail, setFormEmail] = useState('')
+  const [formMaxBoletas, setFormMaxBoletas] = useState('')
 
   const [editUser, setEditUser] = useState<VendedorStats | null>(null)
   const [editNombre, setEditNombre] = useState('')
@@ -116,8 +112,7 @@ export default function VendedoresStatsPage() {
 
   const personasDelGrupo = useMemo(() => {
     if (grupo === 'ADMINS') return data.filter((d) => d.rol === 'ADMIN')
-    if (grupo === 'VENDEDORES') return data.filter((d) => d.rol === 'VENDEDOR')
-    return data
+    return data.filter((d) => d.rol === 'VENDEDOR')
   }, [data, grupo])
 
   useEffect(() => {
@@ -129,8 +124,7 @@ export default function VendedoresStatsPage() {
   const filtered = useMemo(() => {
     let rows = data
 
-    if (grupo === 'ADMINS') rows = rows.filter((d) => d.rol === 'ADMIN')
-    if (grupo === 'VENDEDORES') rows = rows.filter((d) => d.rol === 'VENDEDOR')
+    rows = rows.filter((d) => d.rol === (grupo === 'ADMINS' ? 'ADMIN' : 'VENDEDOR'))
 
     if (personaId) rows = rows.filter((d) => d.id === personaId)
 
@@ -145,6 +139,21 @@ export default function VendedoresStatsPage() {
   }, [data, grupo, personaId, search])
 
   const resumenVista = useMemo(() => sumMetrics(filtered), [filtered])
+
+  const cuentaVista = useMemo(() => {
+    return filtered.reduce(
+      (acc, r) => {
+        if (r.rol !== 'VENDEDOR') return acc
+        const cg = r.cuenta_global
+        if (!cg) return acc
+        acc.por_cobrar += Number(cg.por_cobrar) || 0
+        acc.entregado += Number(cg.entregado) || 0
+        acc.libres += Number(r.boletas_libres) || 0
+        return acc
+      },
+      { por_cobrar: 0, entregado: 0, libres: 0 }
+    )
+  }, [filtered])
 
   const abrirCrear = () => {
     setCrearError(null)
@@ -167,6 +176,9 @@ export default function VendedoresStatsPage() {
         password: formPassword,
         rol: formRol,
         ...(formEmail.trim() ? { email: formEmail.trim() } : {}),
+        ...(formRol === 'VENDEDOR' && formMaxBoletas.trim()
+          ? { max_boletas_inventario: Number(formMaxBoletas) }
+          : {}),
       })
       setCrearOk(res.data)
       setFormPassword('')
@@ -247,7 +259,7 @@ export default function VendedoresStatsPage() {
                 Dashboard
               </a>
               <span className="text-slate-300">/</span>
-              <h1 className="text-base font-semibold text-slate-800">Equipo</h1>
+              <h1 className="text-base font-semibold text-slate-800">Equipo y cuentas</h1>
             </div>
             <button
               type="button"
@@ -294,9 +306,8 @@ export default function VendedoresStatsPage() {
                 }}
                 className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
               >
-                <option value="TODOS">Admins + Vendedores</option>
-                <option value="ADMINS">Admins (general)</option>
-                <option value="VENDEDORES">Vendedores (general)</option>
+                <option value="ADMINS">Admins</option>
+                <option value="VENDEDORES">Vendedores</option>
               </select>
             </div>
             <div>
@@ -307,15 +318,11 @@ export default function VendedoresStatsPage() {
                 className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
               >
                 <option value="">
-                  {grupo === 'ADMINS'
-                    ? 'Todos los admins'
-                    : grupo === 'VENDEDORES'
-                      ? 'Todos los vendedores'
-                      : 'Todos'}
+                  {grupo === 'ADMINS' ? 'Todos los admins' : 'Todos los vendedores'}
                 </option>
                 {personasDelGrupo.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.nombre} ({p.rol === 'ADMIN' ? 'Admin' : 'Vendedor'})
+                    {p.nombre}
                   </option>
                 ))}
               </select>
@@ -342,7 +349,7 @@ export default function VendedoresStatsPage() {
                 onClick={() => {
                   setFechaInicio('')
                   setFechaFin('')
-                  setGrupo('TODOS')
+                  setGrupo('VENDEDORES')
                   setPersonaId('')
                   setSearch('')
                   setTimeout(load, 0)
@@ -393,27 +400,29 @@ export default function VendedoresStatsPage() {
           </div>
         </section>
 
-        <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <KpiCard label="Personas en vista" value={filtered.length} />
-          <KpiCard label="Ventas" value={resumenVista.total_ventas} />
-          <KpiCard label="Clientes (suma)" value={resumenVista.clientes_unicos} />
-          <KpiCard label="Monto total" value={fmtMoney(resumenVista.monto_total)} />
-          <KpiCard label="Abonado" value={fmtMoney(resumenVista.abonado_total)} highlight="emerald" />
-          <KpiCard label="Saldo pendiente" value={fmtMoney(resumenVista.saldo_pendiente)} highlight="amber" />
+          <KpiCard label="Por cobrar (vendedores)" value={fmtMoney(cuentaVista.por_cobrar)} highlight="rose" />
+          <KpiCard label="Entregado (liquidaciones)" value={fmtMoney(cuentaVista.entregado)} highlight="emerald" />
+          <KpiCard label="Boletas libres (inv.)" value={cuentaVista.libres} />
+          <KpiCard label="Saldo clientes (ventas)" value={fmtMoney(resumenVista.saldo_pendiente)} highlight="amber" />
         </section>
+        <p className="text-xs text-slate-500 -mt-3 px-1">
+          Cuenta vendedores: lo que cobran a clientes menos su comisión; el resto se registra con{' '}
+          <strong>Registrar entrega</strong> en el detalle (solo super admin). No entra al recaudo del panel hasta
+          esa liquidación.
+        </p>
 
         <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-800">
               {grupo === 'ADMINS'
                 ? personaId
-                  ? 'Admin individual'
-                  : 'Admins (general)'
-                : grupo === 'VENDEDORES'
-                  ? personaId
-                    ? 'Vendedor individual'
-                    : 'Vendedores (general)'
-                  : 'Equipo'}{' '}
+                  ? 'Admin'
+                  : 'Admins'
+                : personaId
+                  ? 'Vendedor'
+                  : 'Vendedores'}{' '}
               ({filtered.length})
             </h2>
           </div>
@@ -429,79 +438,157 @@ export default function VendedoresStatsPage() {
           ) : filtered.length === 0 ? (
             <div className="p-10 text-center text-sm text-slate-400">Sin resultados</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-                  <tr>
-                    <th className="px-4 py-2 text-left">Usuario</th>
-                    <th className="px-4 py-2 text-left">Rol</th>
-                    <th className="px-4 py-2 text-right">Ventas</th>
-                    <th className="px-4 py-2 text-right">Clientes</th>
-                    <th className="px-4 py-2 text-right">Boletas vendidas</th>
-                    <th className="px-4 py-2 text-right">Reservadas</th>
-                    <th className="px-4 py-2 text-right">Abonadas</th>
-                    <th className="px-4 py-2 text-right">Pagadas</th>
-                    <th className="px-4 py-2 text-right">Monto</th>
-                    <th className="px-4 py-2 text-right">Abonado</th>
-                    <th className="px-4 py-2 text-right">Saldo</th>
-                    <th className="px-4 py-2"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((v) => (
-                    <tr key={v.id} className="border-t border-slate-100 hover:bg-slate-50/60">
-                      <td className="px-4 py-2">
-                        <div className="font-medium text-slate-800">{v.nombre}</div>
-                        <div className="text-xs text-slate-400">{v.email}</div>
-                      </td>
-                      <td className="px-4 py-2">
-                        <span
-                          className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
-                            ROLE_BADGE[v.rol] || 'bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          {v.rol === 'ADMIN' ? 'Admin' : 'Vendedor'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2 text-right text-slate-700">{v.total_ventas}</td>
-                      <td className="px-4 py-2 text-right text-slate-700">{v.clientes_unicos}</td>
-                      <td className="px-4 py-2 text-right text-slate-700">{v.boletas_vendidas}</td>
-                      <td className="px-4 py-2 text-right text-amber-600">{v.boletas_reservadas}</td>
-                      <td className="px-4 py-2 text-right text-blue-600">{v.boletas_abonadas}</td>
-                      <td className="px-4 py-2 text-right text-emerald-600">{v.boletas_pagadas}</td>
-                      <td className="px-4 py-2 text-right font-medium text-slate-800">
-                        {fmtMoney(v.monto_total)}
-                      </td>
-                      <td className="px-4 py-2 text-right text-emerald-600">
-                        {fmtMoney(v.abonado_total)}
-                      </td>
-                      <td className="px-4 py-2 text-right text-amber-600">
-                        {fmtMoney(v.saldo_pendiente)}
-                      </td>
-                      <td className="px-4 py-2 text-right whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => abrirEditar(v)}
-                          className="text-xs font-medium text-slate-600 hover:text-slate-900 mr-3"
-                        >
-                          Editar
-                        </button>
-                        <a
-                          href={`/vendedores/${v.id}${
-                            fechaInicio || fechaFin
-                              ? `?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`
-                              : ''
-                          }`}
-                          className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
-                        >
-                          Ver detalle →
-                        </a>
-                      </td>
+            <>
+              <div className="md:hidden divide-y divide-slate-100">
+                {filtered.map((v) => (
+                  <div key={v.id} className="p-4 space-y-3">
+                    <div>
+                      <div className="font-semibold text-slate-900">{v.nombre}</div>
+                      <div className="text-xs text-slate-500 break-all">{v.email}</div>
+                    </div>
+                    <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                      <div>
+                        <dt className="text-slate-400">Clientes</dt>
+                        <dd className="font-semibold text-slate-800">{v.clientes_unicos}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-400">Boletas vendidas</dt>
+                        <dd className="font-semibold text-slate-800">{v.boletas_vendidas}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-400">Libres</dt>
+                        <dd className="font-semibold text-indigo-700">
+                          {v.rol === 'VENDEDOR' ? v.boletas_libres ?? 0 : '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-400">Reservadas</dt>
+                        <dd className="font-semibold text-amber-700">{v.boletas_reservadas}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-400">Abonadas</dt>
+                        <dd className="font-semibold text-blue-700">{v.boletas_abonadas}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-400">Pagadas</dt>
+                        <dd className="font-semibold text-emerald-700">{v.boletas_pagadas}</dd>
+                      </div>
+                      {v.rol === 'VENDEDOR' && (
+                        <>
+                          <div>
+                            <dt className="text-slate-400">Por cobrar</dt>
+                            <dd className="font-semibold text-rose-700">
+                              {fmtMoney(v.cuenta_global?.por_cobrar ?? 0)}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-slate-400">Entregado</dt>
+                            <dd className="font-semibold text-emerald-700">
+                              {fmtMoney(v.cuenta_global?.entregado ?? 0)}
+                            </dd>
+                          </div>
+                        </>
+                      )}
+                    </dl>
+                    <div className="flex gap-3 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => abrirEditar(v)}
+                        className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                      >
+                        Editar
+                      </button>
+                      <a
+                        href={`/vendedores/${v.id}${
+                          fechaInicio || fechaFin
+                            ? `?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`
+                            : ''
+                        }`}
+                        className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                      >
+                        Ver detalle →
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="hidden md:block overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                    <tr>
+                      <th className="px-3 py-2 text-left sticky left-0 bg-slate-50 z-[1]">Usuario</th>
+                      <th className="px-3 py-2 text-right">Clientes</th>
+                      <th className="px-3 py-2 text-right">Vendidas</th>
+                      <th className="px-3 py-2 text-right">Libres</th>
+                      <th className="px-3 py-2 text-right">Reserv.</th>
+                      <th className="px-3 py-2 text-right">Abon.</th>
+                      <th className="px-3 py-2 text-right">Pag.</th>
+                      {grupo === 'VENDEDORES' && (
+                        <>
+                          <th className="px-3 py-2 text-right">Por cobrar</th>
+                          <th className="px-3 py-2 text-right">Entregado</th>
+                        </>
+                      )}
+                      <th className="px-3 py-2"></th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {filtered.map((v) => (
+                      <tr key={v.id} className="border-t border-slate-100 hover:bg-slate-50/60">
+                        <td className="px-3 py-2 sticky left-0 bg-white z-[1] min-w-[140px]">
+                          <div className="font-medium text-slate-800">{v.nombre}</div>
+                          <div className="text-xs text-slate-400 truncate max-w-[200px]">{v.email}</div>
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">{v.clientes_unicos}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{v.boletas_vendidas}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-indigo-700 font-medium">
+                          {v.rol === 'VENDEDOR' ? v.boletas_libres ?? 0 : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-amber-600">
+                          {v.boletas_reservadas}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-blue-600">
+                          {v.boletas_abonadas}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-emerald-600">
+                          {v.boletas_pagadas}
+                        </td>
+                        {grupo === 'VENDEDORES' && (
+                          <>
+                            <td className="px-3 py-2 text-right font-medium text-rose-600 tabular-nums">
+                              {fmtMoney(v.cuenta_global?.por_cobrar ?? 0)}
+                            </td>
+                            <td className="px-3 py-2 text-right text-emerald-600 tabular-nums">
+                              {fmtMoney(v.cuenta_global?.entregado ?? 0)}
+                            </td>
+                          </>
+                        )}
+                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => abrirEditar(v)}
+                            className="text-xs font-medium text-slate-600 hover:text-slate-900 mr-2"
+                          >
+                            Editar
+                          </button>
+                          <a
+                            href={`/vendedores/${v.id}${
+                              fechaInicio || fechaFin
+                                ? `?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`
+                                : ''
+                            }`}
+                            className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                          >
+                            Detalle →
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </section>
       </main>
@@ -554,6 +641,36 @@ export default function VendedoresStatsPage() {
                   <option value="ADMIN">Administrador</option>
                   <option value="VENDEDOR">Vendedor</option>
                 </select>
+                {formRol === 'VENDEDOR' && (
+                  <>
+                    <div className="mt-3">
+                      <label className="text-xs font-medium text-slate-500">
+                        Tope máx. boletas en inventario (por proyecto)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={formMaxBoletas}
+                        onChange={(e) => setFormMaxBoletas(e.target.value)}
+                        className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        placeholder="Ej. 100 (preasigna 10 por cada serie)"
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500 leading-relaxed">
+                      Asigna boletas en{' '}
+                      <a href="/inventario-vendedores" className="text-indigo-600 hover:underline">
+                        Inventario de vendedores
+                      </a>
+                      . El 10% del tope es el cupo de preasignación por serie.
+                    </p>
+                  </>
+                )}
+                {formRol === 'ADMIN' && (
+                  <p className="mt-2 text-xs text-slate-500 leading-relaxed">
+                    Los administradores no reciben inventario: venden del pool común (boletas sin
+                    asignar a vendedores).
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500">
@@ -695,14 +812,16 @@ function KpiCard({
 }: {
   label: string
   value: string | number
-  highlight?: 'emerald' | 'amber'
+  highlight?: 'emerald' | 'amber' | 'rose'
 }) {
   const color =
     highlight === 'emerald'
       ? 'text-emerald-600'
       : highlight === 'amber'
         ? 'text-amber-600'
-        : 'text-slate-800'
+        : highlight === 'rose'
+          ? 'text-rose-600'
+          : 'text-slate-800'
   return (
     <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-3">
       <div className="text-[11px] uppercase tracking-wide text-slate-400 font-medium">{label}</div>

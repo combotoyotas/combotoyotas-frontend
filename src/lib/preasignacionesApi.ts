@@ -4,7 +4,7 @@ const BASE = `${API_BASE_URL}/api/preasignaciones`
 
 export interface Preasignacion {
   id: string
-  cliente_id: string
+  cliente_id: string | null
   numero_boleta: number
   notas: string | null
   creado_por: string | null
@@ -15,7 +15,8 @@ export interface Preasignacion {
   ultima_aplicacion_en: string | null
   created_at: string
   updated_at: string
-  cliente_nombre: string
+  cliente_nombre: string | null
+  creado_por_rol?: string | null
   cliente_telefono: string | null
   cliente_identificacion: string | null
   cliente_email: string | null
@@ -25,8 +26,46 @@ export interface AplicarResultado {
   rifa_id: string
   rifa_nombre: string
   total_preasignaciones: number
-  asignadas: { numero_boleta: number; cliente_nombre: string; venta_id: string }[]
+  asignadas: {
+    numero_boleta: number
+    cliente_nombre: string
+    venta_id: string | null
+    en_inventario_vendedor?: boolean
+    reservada?: boolean
+  }[]
   omitidas: { numero_boleta: number; cliente_nombre: string; motivo: string }[]
+}
+
+export interface CuotasPreasignacion {
+  aplica: boolean
+  configurado?: boolean
+  max_inventario?: number | null
+  max_por_serie?: number
+  max_total?: number
+  fraccion_por_serie?: number
+  total?: number
+  por_serie?: Record<number, number>
+  cupo_por_serie?: Record<number, number>
+}
+
+export interface ResumenPreasignSuper {
+  vendedores: Array<{
+    creado_por: string
+    nombre: string
+    rol: string
+    max_inventario: number | null
+    total_preasignadas: number
+    por_serie: Record<number, number>
+  }>
+  admins: Array<{
+    creado_por: string
+    nombre: string
+    rol: string
+    max_inventario: number | null
+    total_preasignadas: number
+    por_serie: Record<number, number>
+  }>
+  total_registros: number
 }
 
 class PreasignacionesApi {
@@ -71,7 +110,24 @@ class PreasignacionesApi {
     return this.handle<Preasignacion[]>(res)
   }
 
-  async crear(body: { cliente_id: string; numero_boleta: number; notas?: string }): Promise<Preasignacion> {
+  async cuotas(): Promise<CuotasPreasignacion> {
+    const res = await this.fetchWithTimeout(`${BASE}/cuotas`, { headers: this.getAuthHeaders() })
+    return this.handle<CuotasPreasignacion>(res)
+  }
+
+  async resumenSuper(q?: string): Promise<ResumenPreasignSuper> {
+    const qs = q && q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''
+    const res = await this.fetchWithTimeout(`${BASE}/resumen-super${qs}`, {
+      headers: this.getAuthHeaders(),
+    })
+    return this.handle<ResumenPreasignSuper>(res)
+  }
+
+  async crear(body: {
+    cliente_id?: string | null
+    numero_boleta: number
+    notas?: string
+  }): Promise<Preasignacion> {
     const res = await this.fetchWithTimeout(BASE, {
       method: 'POST',
       headers: this.getAuthHeaders(),

@@ -354,7 +354,7 @@ function BoletaVerificada({ data }: { data: VerificacionData }) {
             </svg>
             <div className="h-px bg-slate-700 w-12" />
           </div>
-          <p className="text-slate-700 text-[10px] mt-2 uppercase tracking-widest">Sueños Dorados</p>
+          <p className="text-slate-700 text-[10px] mt-2 uppercase tracking-widest">Rifa Super Toyota</p>
         </div>
       </div>
     </div>

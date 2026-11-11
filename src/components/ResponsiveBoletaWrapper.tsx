@@ -18,7 +18,8 @@ export default function ResponsiveBoletaWrapper({ children, id }: { children: Re
       if (!containerRef.current) return
       const parentWidth =
         containerRef.current.parentElement?.clientWidth ?? containerRef.current.clientWidth
-      const newScale = parentWidth < BOLETA_WIDTH ? parentWidth / BOLETA_WIDTH : 1
+      const usable = Math.max(0, parentWidth - 8)
+      const newScale = usable < BOLETA_WIDTH ? usable / BOLETA_WIDTH : 1
       setScale(newScale)
     }
 

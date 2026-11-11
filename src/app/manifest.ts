@@ -1,18 +1,19 @@
 import type { MetadataRoute } from 'next'
 
-/** Manifest PWA — panel interno (no indexar ni promocionar públicamente). */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Sueños Dorados — Panel interno',
-    short_name: 'SD Panel',
-    description: 'Acceso restringido al equipo. Gestión de ventas y proyectos.',
+    name: 'Rifa Super Toyota',
+    short_name: 'rifasupertoyota',
+    description: 'Panel rifasupertoyota — gestión de rifas, ventas y sorteos.',
     start_url: '/login',
     scope: '/',
     display: 'standalone',
+    display_override: ['standalone', 'minimal-ui'],
     orientation: 'portrait-primary',
-    background_color: '#101010',
-    theme_color: '#101010',
+    background_color: '#f8fafc',
+    theme_color: '#4f46e5',
     lang: 'es',
+    categories: ['business', 'productivity'],
     icons: [
       {
         src: '/icons/icon-192.png',

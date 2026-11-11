@@ -28,6 +28,8 @@ interface ClienteListProps {
   loading: boolean
   /** Mostrar columna de vendedor(es) — admin/superadmin */
   showVendedores?: boolean
+  /** Mostrar quién creó el registro — admin y superadmin (pool compartido) */
+  showCreadoPor?: boolean
 }
 
 const formatCurrency = (value: number) => {
@@ -86,6 +88,7 @@ export default function ClienteList({
   filtroActivo,
   loading,
   showVendedores = false,
+  showCreadoPor = false,
 }: ClienteListProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [cargandoRecordatorio, setCargandoRecordatorio] = useState<string | null>(null)
@@ -196,7 +199,11 @@ export default function ClienteList({
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase">Cliente</th>
                     <th className="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase">Teléfono</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase">Código</th>
                     <th className="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase">Identificación</th>
+                    {showCreadoPor && (
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase">Creado por</th>
+                    )}
                     {showVendedores && (
                       <th className="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase">Vendedor(es)</th>
                     )}
@@ -221,7 +228,23 @@ export default function ClienteList({
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-black">{cliente.telefono}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700 font-mono">{cliente.codigo || '—'}</td>
                       <td className="px-4 py-3 text-sm text-black font-mono">{cliente.identificacion}</td>
+                      {showCreadoPor && (
+                        <td className="px-4 py-3 text-sm text-slate-700">
+                          <span
+                            className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded ${
+                              cliente.creado_por_rol === 'VENDEDOR'
+                                ? 'bg-amber-50 text-amber-900'
+                                : cliente.creado_por === null || cliente.creado_por === undefined
+                                  ? 'bg-slate-100 text-slate-700'
+                                  : 'bg-violet-50 text-violet-800'
+                            }`}
+                          >
+                            {cliente.creado_por_etiqueta || '—'}
+                          </span>
+                        </td>
+                      )}
                       {showVendedores && (
                         <td className="px-4 py-3 text-sm text-slate-700">
                           {(cliente.vendedores || []).length > 0 ? (
@@ -333,7 +356,15 @@ export default function ClienteList({
                       </div>
                       <div className="min-w-0">
                         <div className="font-bold text-black truncate">{cliente.nombre}</div>
-                        <div className="text-xs text-slate-500">{cliente.identificacion} · {cliente.telefono}</div>
+                        <div className="text-xs text-slate-500">
+                          {cliente.codigo && <span className="font-mono">{cliente.codigo} · </span>}
+                          {cliente.identificacion} · {cliente.telefono}
+                        </div>
+                        {showCreadoPor && cliente.creado_por_etiqueta && (
+                          <div className="text-[11px] text-slate-600 mt-0.5">
+                            Creado: {cliente.creado_por_etiqueta}
+                          </div>
+                        )}
                         {showVendedores && (cliente.vendedores || []).length > 0 && (
                           <div className="text-[11px] text-indigo-700 mt-0.5">
                             {(cliente.vendedores || []).join(', ')}
