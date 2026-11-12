@@ -4,6 +4,8 @@ import "./globals.css";
 import PausaGuard from "@/components/PausaGuard";
 import ModuleShell from "@/components/layout/ModuleShell";
 import PwaNativeEffects from "@/components/pwa/PwaNativeEffects";
+import PwaUpdatePrompt from "@/components/pwa/PwaUpdatePrompt";
+import { BRAND_NAME, BRAND_SHORT, BRAND_THEME_COLOR } from "@/config/brand";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,9 +18,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Rifa Super Toyota | Panel de Administración",
-  description: "Plataforma rifasupertoyota — gestión de rifas, ventas y sorteos",
-  applicationName: "Rifa Super Toyota",
+  title: `${BRAND_NAME} | Panel de Administración`,
+  description: `${BRAND_SHORT} — gestión de rifas, ventas y sorteos`,
+  applicationName: BRAND_NAME,
   manifest: "/manifest.webmanifest",
   robots: {
     index: false,
@@ -29,7 +31,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Rifa Super Toyota",
+    title: BRAND_NAME,
   },
   formatDetection: {
     telephone: false,
@@ -46,7 +48,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#4f46e5",
+  themeColor: BRAND_THEME_COLOR,
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -65,6 +67,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen min-h-dvh bg-[#f8fafc]`}
       >
         <PwaNativeEffects />
+        <PwaUpdatePrompt />
         <PausaGuard>
           <ModuleShell>{children}</ModuleShell>
         </PausaGuard>

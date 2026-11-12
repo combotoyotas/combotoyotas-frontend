@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { API_BASE_URL } from '@/config/api'
 import { TokenManager } from '@/utils/auth'
 import InstalarAppButton from '@/components/pwa/InstalarAppButton'
+import BrandLogo from '@/components/brand/BrandLogo'
+import { BRAND_NAME, BRAND_TAGLINE } from '@/config/brand'
 
 interface LoginFormData {
   email: string
@@ -191,15 +193,11 @@ export default function LoginPage() {
         />
         <div className="relative z-10 flex flex-col justify-center px-16 text-white">
           <div className="mb-8">
-            <div className="w-14 h-14 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-6 border border-white/20">
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-              </svg>
+            <div className="mb-6 max-w-sm">
+              <BrandLogo height={120} priority className="drop-shadow-2xl" />
             </div>
-            <h2 className="text-4xl font-bold tracking-tight mb-3">Rifa Super Toyota</h2>
-            <p className="text-indigo-200 text-lg leading-relaxed max-w-md">
-              Plataforma profesional de gestión de rifas, ventas y sorteos en tiempo real.
-            </p>
+            <h2 className="text-3xl font-bold tracking-tight mb-3 sr-only">{BRAND_NAME}</h2>
+            <p className="text-indigo-200 text-lg leading-relaxed max-w-md">{BRAND_TAGLINE}</p>
           </div>
           <div className="space-y-4 mt-4">
             {['Gestión de ventas en tiempo real', 'Control de boletas y abonos', 'Reportes y analítica avanzada'].map((item) => (
@@ -219,11 +217,7 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-6 sm:p-8 bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="w-full max-w-[420px] animate-fade-in">
           <div className="lg:hidden text-center mb-8">
-            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-              </svg>
-            </div>
+            <BrandLogo height={72} priority className="mx-auto" />
           </div>
 
           <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/60 p-8 sm:p-10 border border-slate-100">
@@ -286,7 +280,7 @@ export default function LoginPage() {
 
             <div className="mt-8 pt-6 border-t border-slate-100 text-center">
               <p className="text-xs text-slate-400">
-                Rifa Super Toyota © {new Date().getFullYear()} · Todos los derechos reservados
+                {BRAND_NAME} © {new Date().getFullYear()} · Todos los derechos reservados
               </p>
             </div>
           </div>

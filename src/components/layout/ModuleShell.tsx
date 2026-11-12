@@ -80,9 +80,9 @@ export default function ModuleShell({ children }: { children: React.ReactNode })
           </button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-slate-900">
-              {pathname === '/dashboard' ? 'Inicio' : activeModule?.label ?? 'Rifa Super Toyota'}
+              {pathname === '/dashboard' ? 'Inicio' : activeModule?.label ?? 'Combo Toyotas'}
             </p>
-            <p className="truncate text-[11px] text-slate-400">rifasupertoyota</p>
+            <p className="truncate text-[11px] text-slate-400">Combotoyotas</p>
           </div>
         </header>
 

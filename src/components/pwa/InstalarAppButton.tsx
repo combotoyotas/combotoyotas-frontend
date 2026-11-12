@@ -120,7 +120,7 @@ export default function InstalarAppButton() {
                   <h2 id="pwa-guide-title" className="text-sm font-semibold text-slate-900">
                     Instalar en {guide === 'ios' ? 'iPhone' : 'Android'}
                   </h2>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Rifa Super Toyota</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Combo Toyotas</p>
                 </div>
               </div>
               <button

@@ -9,6 +9,9 @@ import { getStorageImageUrl } from '@/lib/storageImageUrl'
 import { Rifa } from '@/types/rifa'
 import { BoletaGenerateRequest } from '@/types/boleta'
 import BoletaPreview from '@/components/BoletaPreview'
+import { PUBLIC_SITE_BASE_URL } from '@/config/combotoyotasContact'
+
+const DEFAULT_QR_BASE = `${PUBLIC_SITE_BASE_URL.replace(/\/$/, '')}/verificar/`
 
 export default function CrearBoletasPage() {
   const [rifas, setRifas] = useState<Rifa[]>([])
@@ -26,7 +29,7 @@ export default function CrearBoletasPage() {
   
   // Form fields for the new parameters
   const [formData, setFormData] = useState<BoletaGenerateRequest>({
-    qr_base_url: 'https://rifasupertoyota.com.co/verificar/',
+    qr_base_url: DEFAULT_QR_BASE,
     imagen_url: '',
     diseño_template: 'modern',
     modo_pareo: 'manual',
@@ -428,12 +431,12 @@ export default function CrearBoletasPage() {
                     id="qr_base_url"
                     value={formData.qr_base_url}
                     onChange={(e) => handleInputChange('qr_base_url', e.target.value)}
-                    placeholder="https://rifasupertoyota.com.co/verificar/"
+                    placeholder={DEFAULT_QR_BASE}
                     className="w-full px-4 py-2 border border-slate-400 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none text-black bg-white"
                     disabled={creating}
                   />
                   <p className="mt-1 text-xs text-slate-500">
-                    URL donde el cliente verá el estado de su boleta al escanear el QR (ej. rifasupertoyota.com.co).
+                    URL donde el cliente verá el estado de su boleta al escanear el QR (sitio público de Combo Toyotas).
                   </p>
                 </div>
 

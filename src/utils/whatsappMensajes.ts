@@ -1,10 +1,12 @@
 /**
- * Mensajes de WhatsApp para clientes — tono humano, marca Rifa Super Toyota.
+ * Mensajes de WhatsApp para clientes — tono humano, marca Combo Toyotas.
  */
 import { formatBoletaNumeros } from '@/utils/formatBoletaNumeros'
 import { getMediosDePagoTexto } from '@/config/paymentInfo'
+import { BRAND_NAME } from '@/config/brand'
+import { PUBLIC_SITE_BASE_URL } from '@/config/combotoyotasContact'
 
-export const LINK_CONSULTA_BOLETAS = 'https://rifasupertoyota.com.co/mis-boletas'
+export const LINK_CONSULTA_BOLETAS = `${PUBLIC_SITE_BASE_URL}/mis-boletas`
 
 const fmt = (value: number) =>
   new Intl.NumberFormat('es-CO', {
@@ -86,7 +88,7 @@ export function mensajeRecordatorioPendiente(opts: {
   const pachas = opts.pachas.filter(Boolean)
 
   let msg = `👋 ¡Hola! ${nombre}\n\n`
-  msg += `Te recordamos que este sábado juega nuestra rifa de Rifa Super Toyota ✨\n\n`
+  msg += `Te recordamos que este sábado juega nuestra rifa de ${BRAND_NAME} ✨\n\n`
   msg += `La NMAX 2027 0 km\n`
   msg += `Y el iPhone 17 Pro Max con el número invertido\n\n`
 
@@ -132,7 +134,7 @@ export function mensajeReservaRecibida(opts: {
 }): string {
   const nombre = opts.nombre || 'amigo/a'
   let msg = `Hola ${nombre} 👋\n\n`
-  msg += `Somos de *Rifa Super Toyota*. Ya quedó tu reserva en *${nombreProyecto(opts.rifaNombre)}*:\n\n`
+  msg += `Somos de *${BRAND_NAME}*. Ya quedó tu reserva en *${nombreProyecto(opts.rifaNombre)}*:\n\n`
   msg += `🎟️ Tus boletas: *${opts.pachas}*\n`
   msg += `💵 Total: *${fmt(opts.montoTotal)}*\n\n`
   msg += `Para ir participando en los premios, ve abonando cuando puedas. Si tienes duda de cuánto te falta, escríbenos.\n\n`
@@ -153,7 +155,7 @@ export function mensajeSaldoPendienteVenta(opts: {
 }): string {
   const nombre = opts.nombre || 'amigo/a'
   let msg = `Hola ${nombre} 👋\n\n`
-  msg += `Te escribimos de *Rifa Super Toyota*. Te quedó un saldo de *${fmt(opts.saldo)}* en *${nombreProyecto(opts.rifaNombre)}*.\n\n`
+  msg += `Te escribimos de *${BRAND_NAME}*. Te quedó un saldo de *${fmt(opts.saldo)}* en *${nombreProyecto(opts.rifaNombre)}*.\n\n`
   msg += `🎟️ Tus boletas: *${opts.pachas}*\n`
   msg += `Total: ${fmt(opts.montoTotal)} · Ya llevas: ${fmt(opts.abonado)}\n\n`
   msg += `${bloquePago()}\n\n`
@@ -171,7 +173,7 @@ export function mensajePagoPendienteVenta(opts: {
 }): string {
   const nombre = opts.nombre || 'amigo/a'
   let msg = `Hola ${nombre} 👋\n\n`
-  msg += `Te escribimos de *Rifa Super Toyota*. Te recordamos el pago pendiente de *${fmt(opts.saldo)}* en *${nombreProyecto(opts.rifaNombre)}*.\n\n`
+  msg += `Te escribimos de *${BRAND_NAME}*. Te recordamos el pago pendiente de *${fmt(opts.saldo)}* en *${nombreProyecto(opts.rifaNombre)}*.\n\n`
   msg += `🎟️ Tus boletas: *${opts.pachas}*\n\n`
   msg += `${bloquePago()}\n\n`
   msg += `Cuando pagues, envíanos el comprobante por este chat 🙌\n\n`
@@ -195,7 +197,7 @@ export function mensajeConfirmacionAbono(opts: {
 
   if (opts.cuentaSaldada) {
     msg += `Hola ${nombre} 👋\n\n`
-    msg += `¡Listo! En *Rifa Super Toyota* ya quedó registrado tu pago de *${fmt(opts.montoAbonado)}* 🎉\n\n`
+    msg += `¡Listo! En *${BRAND_NAME}* ya quedó registrado tu pago de *${fmt(opts.montoAbonado)}* 🎉\n\n`
     msg += `*Tu cuenta en ${nombreProyecto(opts.rifaNombre)}:*\n`
     msg += `💵 Total: ${fmt(opts.montoTotal)}\n`
     msg += `✅ Pagado: ${fmt(opts.nuevoPagado)}\n`
@@ -207,7 +209,7 @@ export function mensajeConfirmacionAbono(opts: {
     msg += cierreConsulta()
   } else {
     msg += `Hola ${nombre} 👋\n\n`
-    msg += `En *Rifa Super Toyota* ya quedó tu abono de *${fmt(opts.montoAbonado)}* ✅\n\n`
+    msg += `En *${BRAND_NAME}* ya quedó tu abono de *${fmt(opts.montoAbonado)}* ✅\n\n`
     msg += `*Tu cuenta en ${nombreProyecto(opts.rifaNombre)}:*\n`
     msg += `💵 Total: ${fmt(opts.montoTotal)}\n`
     msg += `✅ Pagado: ${fmt(opts.nuevoPagado)}\n`
@@ -233,7 +235,7 @@ export function mensajeComprobanteVenta(opts: {
 }): string {
   const nombre = opts.nombre || 'amigo/a'
   let msg = `Hola ${nombre} 👋\n\n`
-  msg += `Te enviamos el detalle de tu compra en *Rifa Super Toyota*:\n\n`
+  msg += `Te enviamos el detalle de tu compra en *${BRAND_NAME}*:\n\n`
   msg += `📋 Tipo: ${opts.tipoLabel}\n`
   msg += `🎟️ Boletas: ${opts.pachas}\n`
   msg += `💵 Total: ${fmt(opts.montoTotal)}\n`
@@ -257,7 +259,7 @@ export function mensajeComprobanteAbono(opts: {
 }): string {
   const nombre = opts.nombre || 'amigo/a'
   let msg = `Hola ${nombre} 👋\n\n`
-  msg += `Confirmamos tu abono en *Rifa Super Toyota*:\n\n`
+  msg += `Confirmamos tu abono en *${BRAND_NAME}*:\n\n`
   msg += `💵 Abonaste: ${fmt(opts.monto)}\n`
   msg += `🎟️ Boletas: ${opts.pachas}\n`
   msg += `Total de la venta: ${fmt(opts.montoTotal)}\n`
@@ -278,7 +280,7 @@ export function mensajeClienteConfirmaReserva(opts: {
   montoTotal: number
 }): string {
   return (
-    `Hola, soy ${opts.nombre}. Confirmé mi reserva en *Rifa Super Toyota*.\n` +
+    `Hola, soy ${opts.nombre}. Confirmé mi reserva en *${BRAND_NAME}*.\n` +
     `Tel: ${opts.telefono}\n` +
     `Boletas: ${opts.pachas}\n` +
     `Total: ${fmt(opts.montoTotal)}`
@@ -297,7 +299,7 @@ export function mensajeCompartirBoletaAlCliente(opts: {
   const pacha = formatPacha(opts.numeros, opts.numero)
   const proyecto = nombreProyecto(opts.rifaNombre || 'proyecto')
   let msg = `Hola ${primerNombre} 👋\n\n`
-  msg += `Te comparto tu boleta en *Rifa Super Toyota*:\n\n`
+  msg += `Te comparto tu boleta en *${BRAND_NAME}*:\n\n`
   msg += `🎟️ ${pacha}\n`
   msg += `📋 Proyecto: *${proyecto}*\n`
   msg += `📌 Estado: *${opts.estadoLabel}*\n\n`

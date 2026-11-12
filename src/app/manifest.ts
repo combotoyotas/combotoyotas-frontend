@@ -1,17 +1,23 @@
 import type { MetadataRoute } from 'next'
+import {
+  BRAND_BACKGROUND_COLOR,
+  BRAND_NAME,
+  BRAND_SHORT,
+  BRAND_THEME_COLOR,
+} from '@/config/brand'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Rifa Super Toyota',
-    short_name: 'rifasupertoyota',
-    description: 'Panel rifasupertoyota — gestión de rifas, ventas y sorteos.',
+    name: `${BRAND_NAME} — Panel`,
+    short_name: BRAND_SHORT,
+    description: `${BRAND_SHORT} — gestión de rifas, ventas y sorteos.`,
     start_url: '/login',
     scope: '/',
     display: 'standalone',
     display_override: ['standalone', 'minimal-ui'],
     orientation: 'portrait-primary',
-    background_color: '#f8fafc',
-    theme_color: '#4f46e5',
+    background_color: BRAND_BACKGROUND_COLOR,
+    theme_color: BRAND_THEME_COLOR,
     lang: 'es',
     categories: ['business', 'productivity'],
     icons: [

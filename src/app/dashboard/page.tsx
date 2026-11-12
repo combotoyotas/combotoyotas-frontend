@@ -678,7 +678,7 @@ export default function DashboardPage() {
 
       {/* Footer */}
       <footer className="mt-auto py-6 text-center">
-        <p className="text-xs text-slate-400">Rifa Super Toyota © {new Date().getFullYear()} · v2.0</p>
+        <p className="text-xs text-slate-400">Combo Toyotas © {new Date().getFullYear()} · v2.0</p>
       </footer>
     </div>
   )

@@ -112,7 +112,7 @@ export default function AdminShell({ children }: Props) {
               className="text-sm font-[800] uppercase tracking-tight truncate"
               style={{ fontFamily: 'var(--font-display)' }}
             >
-              Rifa Super Toyota
+              Combo Toyotas
             </p>
             <p className="text-[10px] text-[var(--primary)]/80 uppercase tracking-[0.12em] truncate">
               {roleLabel}
@@ -157,7 +157,7 @@ export default function AdminShell({ children }: Props) {
               if (!isDesktop) setOpen(false)
             }}
           >
-            <span className="font-display font-[800] text-sm tracking-tight">RF</span>
+            <span className="font-display font-[800] text-sm tracking-tight">CT</span>
           </Link>
           {(isDesktop ? open : true) && (
             <div className="min-w-0 flex-1">
@@ -165,7 +165,7 @@ export default function AdminShell({ children }: Props) {
                 className="text-sm font-[800] uppercase tracking-tight truncate"
                 style={{ fontFamily: 'var(--font-display)' }}
               >
-                Rifa Super Toyota
+                Combo Toyotas
               </p>
               <p className="text-[10px] text-[var(--primary)]/80 uppercase tracking-[0.14em] truncate">
                 {roleLabel}

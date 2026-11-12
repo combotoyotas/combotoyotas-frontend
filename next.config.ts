@@ -16,7 +16,8 @@ const withPWA = withPWAInit({
   aggressiveFrontEndNavCaching: false,
   cacheStartUrl: false,
   workboxOptions: {
-    skipWaiting: true,
+    // Esperar confirmación del usuario (PwaUpdatePrompt) antes de activar el SW nuevo
+    skipWaiting: false,
     clientsClaim: true,
     // API y mutaciones siempre por red — nunca datos en caché
     runtimeCaching: [

@@ -33,6 +33,8 @@ import {
   normalizeRole,
 } from '@/config/modules'
 import { TokenManager } from '@/utils/auth'
+import BrandLogo from '@/components/brand/BrandLogo'
+import { BRAND_NAME } from '@/config/brand'
 
 const MODULE_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   ventas: ShoppingCart,
@@ -126,11 +128,11 @@ function SidebarContent({
           onClick={onNavigate}
           className="flex items-center gap-3 rounded-xl p-1 transition-colors hover:bg-slate-50"
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-700 shadow-lg shadow-indigo-600/20">
-            <Ticket className="h-5 w-5 text-white" />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-black shadow-md">
+            <BrandLogo height={36} className="max-h-9" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-slate-900">Rifa Super Toyota</p>
+            <p className="truncate text-sm font-semibold text-slate-900">{BRAND_NAME}</p>
             <p className="text-[11px] text-slate-400">Panel de Administración</p>
           </div>
         </Link>
