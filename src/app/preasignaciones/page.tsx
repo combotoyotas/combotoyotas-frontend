@@ -41,7 +41,7 @@ function formatFecha(iso: string | null) {
   return new Date(iso).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
 }
 
-function agruparPorCliente(items: Preasignacion[]): ClienteGrupo[] {
+function agruparPorCliente(items: Preasignacion[], esInventarioAjeno = false): ClienteGrupo[] {
   const mapa = new Map<string, ClienteGrupo>()
   for (const item of items) {
     const grupoId = item.cliente_id ?? SOLO_INVENTARIO_ID
@@ -50,7 +50,9 @@ function agruparPorCliente(items: Preasignacion[]): ClienteGrupo[] {
         clienteId: grupoId,
         clienteNombre: item.cliente_id
           ? item.cliente_nombre || 'Cliente'
-          : 'Solo número (mi inventario)',
+          : esInventarioAjeno
+            ? 'Solo número (sin cliente asignado)'
+            : 'Solo número (mi inventario)',
         clienteIdentificacion: item.cliente_id ? item.cliente_identificacion : null,
         clienteTelefono: item.cliente_id ? item.cliente_telefono : null,
         numeros: [],
@@ -62,6 +64,51 @@ function agruparPorCliente(items: Preasignacion[]): ClienteGrupo[] {
     grupo.numeros.sort((a, b) => a.numero_boleta - b.numero_boleta)
   }
   return Array.from(mapa.values()).sort((a, b) => a.clienteNombre.localeCompare(b.clienteNombre))
+}
+
+interface CreadorSeccion {
+  creado_por: string
+  nombre: string
+  rol: string
+  items: Preasignacion[]
+}
+
+function agruparPorCreador(items: Preasignacion[]): { vendedores: CreadorSeccion[]; admins: CreadorSeccion[] } {
+  const mapa = new Map<string, CreadorSeccion>()
+  for (const item of items) {
+    const id = item.creado_por || 'sin-creador'
+    if (!mapa.has(id)) {
+      mapa.set(id, {
+        creado_por: id,
+        nombre: item.creado_por_nombre || 'Sin creador',
+        rol: (item.creado_por_rol || '').toUpperCase() || '—',
+        items: [],
+      })
+    }
+    mapa.get(id)!.items.push(item)
+  }
+  const vendedores: CreadorSeccion[] = []
+  const admins: CreadorSeccion[] = []
+  for (const seccion of mapa.values()) {
+    seccion.items.sort((a, b) => a.numero_boleta - b.numero_boleta)
+    if (seccion.rol === 'VENDEDOR') vendedores.push(seccion)
+    else admins.push(seccion)
+  }
+  vendedores.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+  admins.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+  return { vendedores, admins }
+}
+
+function itemCoincideBusqueda(item: Preasignacion, termino: string): boolean {
+  if (!termino) return true
+  const t = termino.toLowerCase()
+  return (
+    (item.cliente_nombre || '').toLowerCase().includes(t) ||
+    (item.cliente_identificacion || '').toLowerCase().includes(t) ||
+    (item.cliente_telefono || '').toLowerCase().includes(t) ||
+    (item.creado_por_nombre || '').toLowerCase().includes(t) ||
+    formatNumero(item.numero_boleta).includes(t)
+  )
 }
 
 export default function PreasignacionesPage() {
@@ -92,6 +139,7 @@ export default function PreasignacionesPage() {
   const [cuotas, setCuotas] = useState<CuotasPreasignacion | null>(null)
   const [soloNumeroInput, setSoloNumeroInput] = useState('')
   const [resumenSuper, setResumenSuper] = useState<ResumenPreasignSuper | null>(null)
+  const [filtroCreadorId, setFiltroCreadorId] = useState<string | null>(null)
 
   const esSuperAdmin = user?.rol?.toUpperCase() === 'SUPER_ADMIN'
   const esVendedor = user?.rol?.toUpperCase() === 'VENDEDOR'
@@ -151,23 +199,45 @@ export default function PreasignacionesPage() {
     return () => clearTimeout(timer)
   }, [q, esSuperAdmin])
 
-  const gruposExistentes = useMemo(() => agruparPorCliente(items), [items])
+  const terminoBusqueda = q.trim()
+
+  const itemsVisibles = useMemo(() => {
+    let list = items
+    if (esSuperAdmin && filtroCreadorId) {
+      list = list.filter((i) => i.creado_por === filtroCreadorId)
+    }
+    if (terminoBusqueda) {
+      list = list.filter((i) => itemCoincideBusqueda(i, terminoBusqueda))
+    }
+    return list
+  }, [items, esSuperAdmin, filtroCreadorId, terminoBusqueda])
+
+  const seccionesSuper = useMemo(() => {
+    if (!esSuperAdmin) return null
+    return agruparPorCreador(itemsVisibles)
+  }, [itemsVisibles, esSuperAdmin])
+
+  const gruposExistentes = useMemo(
+    () => agruparPorCliente(itemsVisibles, false),
+    [itemsVisibles]
+  )
 
   const grupos = useMemo(() => {
+    if (esSuperAdmin) return []
     const idsExistentes = new Set(gruposExistentes.map((g) => g.clienteId))
     const extras = gruposNuevos.filter((g) => !idsExistentes.has(g.clienteId))
     const todos = [...extras, ...gruposExistentes]
-    const termino = q.trim().toLowerCase()
-    if (!termino) return todos
+    if (!terminoBusqueda) return todos
     return todos.filter((g) =>
-      g.clienteNombre.toLowerCase().includes(termino) ||
-      (g.clienteIdentificacion || '').toLowerCase().includes(termino) ||
-      (g.clienteTelefono || '').toLowerCase().includes(termino) ||
-      g.numeros.some((n) => formatNumero(n.numero_boleta).includes(termino))
+      g.clienteNombre.toLowerCase().includes(terminoBusqueda.toLowerCase()) ||
+      (g.clienteIdentificacion || '').toLowerCase().includes(terminoBusqueda.toLowerCase()) ||
+      (g.clienteTelefono || '').toLowerCase().includes(terminoBusqueda.toLowerCase()) ||
+      g.numeros.some((n) => formatNumero(n.numero_boleta).includes(terminoBusqueda))
     )
-  }, [gruposExistentes, gruposNuevos, q])
+  }, [gruposExistentes, gruposNuevos, terminoBusqueda, esSuperAdmin])
 
   const totalNumeros = items.length
+  const totalVisibles = itemsVisibles.length
 
   const onClienteSeleccionado = (cliente: Cliente) => {
     setShowBuscarCliente(false)
@@ -320,6 +390,143 @@ export default function PreasignacionesPage() {
     })
   }
 
+  const renderListaGrupos = (lista: ClienteGrupo[], expPrefix: string) => (
+    <div className="space-y-3">
+      {lista.map((grupo) => {
+        const expKey = `${expPrefix}::${grupo.clienteId}`
+        const abierto = expandido[expKey] ?? grupo.numeros.length <= 6
+        return (
+          <div key={expKey} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setExpandido((prev) => ({ ...prev, [expKey]: !abierto }))}
+              className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50"
+            >
+              <div>
+                <p className="font-semibold text-slate-900">{grupo.clienteNombre}</p>
+                <p className="text-xs text-slate-500">
+                  {grupo.clienteIdentificacion || '—'} · {grupo.clienteTelefono || '—'}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
+                  {grupo.numeros.length} boleta{grupo.numeros.length !== 1 ? 's' : ''}
+                </span>
+                <svg
+                  className={`w-4 h-4 text-slate-400 transition-transform ${abierto ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </button>
+
+            {abierto && (
+              <div className="px-5 pb-5 border-t border-slate-100 pt-4">
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {grupo.numeros.map((n) => (
+                    <div
+                      key={n.id}
+                      className="group flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 pl-3 pr-1.5 py-1"
+                      title={
+                        n.ultima_aplicacion_en
+                          ? `Aplicada a ${n.ultima_aplicacion_rifa_nombre} · ${formatFecha(n.ultima_aplicacion_en)}`
+                          : 'Aún no aplicada'
+                      }
+                    >
+                      {editandoChip?.id === n.id ? (
+                        <input
+                          autoFocus
+                          type="number"
+                          min={0}
+                          max={9999}
+                          value={editandoChip.valor}
+                          onChange={(e) => setEditandoChip({ id: n.id, valor: e.target.value })}
+                          onKeyDown={(e) => e.key === 'Enter' && guardarEdicionChip()}
+                          onBlur={guardarEdicionChip}
+                          className="w-16 text-sm border border-indigo-300 rounded px-1 py-0.5"
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setEditandoChip({ id: n.id, valor: String(n.numero_boleta) })}
+                          className="font-mono font-semibold text-sm text-slate-800 hover:text-indigo-600"
+                        >
+                          #{formatNumero(n.numero_boleta)}
+                        </button>
+                      )}
+                      {n.ultima_aplicacion_en && (
+                        <span className="text-[10px] text-blue-600 font-medium">✓</span>
+                      )}
+                      {!esSuperAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => quitarNumero(n)}
+                          disabled={procesando === n.id}
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-slate-400 hover:bg-red-100 hover:text-red-600 disabled:opacity-40"
+                          title="Quitar número"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {grupo.numeros.length === 0 && (
+                    <p className="text-sm text-slate-400 italic">Sin boletas en este grupo.</p>
+                  )}
+                </div>
+
+                {!esSuperAdmin && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      max={9999}
+                      value={nuevoNumeroPorCliente[grupo.clienteId] || ''}
+                      onChange={(e) =>
+                        setNuevoNumeroPorCliente((prev) => ({ ...prev, [grupo.clienteId]: e.target.value }))
+                      }
+                      onKeyDown={(e) => e.key === 'Enter' && agregarNumero(grupo.clienteId)}
+                      placeholder="Número de boleta"
+                      className="w-40 rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => agregarNumero(grupo.clienteId)}
+                      disabled={
+                        procesando === grupo.clienteId || !(nuevoNumeroPorCliente[grupo.clienteId] || '').trim()
+                      }
+                      className="px-3 py-1.5 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 font-medium"
+                    >
+                      {procesando === grupo.clienteId ? 'Agregando...' : '+ Agregar boleta'}
+                    </button>
+                    {grupo.numeros.length === 0 && grupo.clienteId !== SOLO_INVENTARIO_ID && (
+                      <button
+                        type="button"
+                        onClick={() => quitarClienteVacio(grupo.clienteId)}
+                        className="text-xs text-slate-400 hover:text-slate-600 ml-auto"
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+
+  const listaVaciaSuper =
+    esSuperAdmin &&
+    seccionesSuper &&
+    seccionesSuper.vendedores.length === 0 &&
+    seccionesSuper.admins.length === 0
+
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -417,14 +624,25 @@ export default function PreasignacionesPage() {
                 ) : (
                   <ul className="space-y-2 text-sm">
                     {resumenSuper.vendedores.map((r) => (
-                      <li key={r.creado_por} className="flex justify-between gap-2 border-b border-slate-50 pb-1">
-                        <span className="font-medium truncate">{r.nombre}</span>
-                        <span className="tabular-nums shrink-0">
-                          {r.total_preasignadas}
-                          {r.max_inventario != null && (
-                            <span className="text-slate-400 text-xs ml-1">(tope inv. {r.max_inventario})</span>
-                          )}
-                        </span>
+                      <li key={r.creado_por}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFiltroCreadorId(r.creado_por)
+                            document.getElementById('lista-preasignaciones')?.scrollIntoView({ behavior: 'smooth' })
+                          }}
+                          className={`w-full flex justify-between gap-2 border-b border-slate-50 pb-1 text-left rounded-md px-1 -mx-1 hover:bg-slate-50 ${
+                            filtroCreadorId === r.creado_por ? 'bg-indigo-50 ring-1 ring-indigo-200' : ''
+                          }`}
+                        >
+                          <span className="font-medium truncate">{r.nombre}</span>
+                          <span className="tabular-nums shrink-0">
+                            {r.total_preasignadas}
+                            {r.max_inventario != null && (
+                              <span className="text-slate-400 text-xs ml-1">(tope inv. {r.max_inventario})</span>
+                            )}
+                          </span>
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -439,9 +657,20 @@ export default function PreasignacionesPage() {
                 ) : (
                   <ul className="space-y-2 text-sm">
                     {resumenSuper.admins.map((r) => (
-                      <li key={r.creado_por} className="flex justify-between gap-2 border-b border-slate-50 pb-1">
-                        <span className="font-medium truncate">{r.nombre}</span>
-                        <span className="tabular-nums shrink-0">{r.total_preasignadas}</span>
+                      <li key={r.creado_por}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFiltroCreadorId(r.creado_por)
+                            document.getElementById('lista-preasignaciones')?.scrollIntoView({ behavior: 'smooth' })
+                          }}
+                          className={`w-full flex justify-between gap-2 border-b border-slate-50 pb-1 text-left rounded-md px-1 -mx-1 hover:bg-slate-50 ${
+                            filtroCreadorId === r.creado_por ? 'bg-indigo-50 ring-1 ring-indigo-200' : ''
+                          }`}
+                        >
+                          <span className="font-medium truncate">{r.nombre}</span>
+                          <span className="tabular-nums shrink-0">{r.total_preasignadas}</span>
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -449,8 +678,17 @@ export default function PreasignacionesPage() {
               </div>
             </div>
             <p className="text-xs text-slate-500 mt-3">
-              Usa el filtro de abajo para buscar por número de boleta o nombre de cliente.
+              Pulsa un nombre para ver solo sus boletas abajo. El buscador filtra por número, cliente o vendedor/admin.
             </p>
+            {filtroCreadorId && (
+              <button
+                type="button"
+                onClick={() => setFiltroCreadorId(null)}
+                className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+              >
+                Ver todos los creadores ({resumenSuper.total_registros} números)
+              </button>
+            )}
           </div>
         )}
 
@@ -485,12 +723,14 @@ export default function PreasignacionesPage() {
 
         <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-6 shadow-sm">
           <label className="block text-sm font-medium text-slate-700 mb-2">
-            Filtrar por cliente o número ({totalNumeros} número{totalNumeros !== 1 ? 's' : ''} preasignado{totalNumeros !== 1 ? 's' : ''})
+            {esSuperAdmin
+              ? `Buscar boleta, cliente o vendedor${filtroCreadorId ? ` (${totalVisibles} de ${totalNumeros})` : ` (${totalVisibles} visibles)`}`
+              : `Filtrar por cliente o número (${totalVisibles} boleta${totalVisibles !== 1 ? 's' : ''} preasignada${totalVisibles !== 1 ? 's' : ''})`}
           </label>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Ej: 0047  ó  Juan Pérez"
+            placeholder={esSuperAdmin ? 'Ej: 0938, Andres, Juan Pérez' : 'Ej: 0047  ó  Juan Pérez'}
             className="w-full rounded-xl border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
@@ -507,116 +747,61 @@ export default function PreasignacionesPage() {
             <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
             Cargando...
           </div>
+        ) : esSuperAdmin && seccionesSuper ? (
+          listaVaciaSuper ? (
+            <div className="bg-white rounded-2xl border border-slate-200 text-center py-12 text-slate-500 text-sm">
+              No hay boletas que coincidan con el filtro.
+            </div>
+          ) : (
+            <div id="lista-preasignaciones" className="space-y-10">
+              {seccionesSuper.vendedores.length > 0 && (
+                <section>
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">
+                    Vendedores
+                  </h2>
+                  <div className="space-y-8">
+                    {seccionesSuper.vendedores.map((sec) => (
+                      <div key={sec.creado_por}>
+                        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-200 pb-2 mb-3">
+                          <h3 className="text-lg font-semibold text-slate-900">{sec.nombre}</h3>
+                          <span className="text-sm text-slate-500 tabular-nums">
+                            {`${sec.items.length} boleta${sec.items.length !== 1 ? 's' : ''} preasignada${sec.items.length !== 1 ? 's' : ''}`}
+                          </span>
+                        </div>
+                        {renderListaGrupos(agruparPorCliente(sec.items, true), sec.creado_por)}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {seccionesSuper.admins.length > 0 && (
+                <section>
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">
+                    Administradores
+                  </h2>
+                  <div className="space-y-8">
+                    {seccionesSuper.admins.map((sec) => (
+                      <div key={sec.creado_por}>
+                        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-200 pb-2 mb-3">
+                          <h3 className="text-lg font-semibold text-slate-900">{sec.nombre}</h3>
+                          <span className="text-sm text-slate-500 tabular-nums">
+                            {`${sec.items.length} boleta${sec.items.length !== 1 ? 's' : ''} preasignada${sec.items.length !== 1 ? 's' : ''}`}
+                          </span>
+                        </div>
+                        {renderListaGrupos(agruparPorCliente(sec.items, true), sec.creado_por)}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+          )
         ) : grupos.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 text-center py-12 text-slate-500 text-sm">
             No hay boletas preasignadas todavía. Usa &quot;+ Buscar cliente&quot; para empezar.
           </div>
         ) : (
-          <div className="space-y-3">
-            {grupos.map((grupo) => {
-              const abierto = expandido[grupo.clienteId] ?? grupo.numeros.length <= 6
-              return (
-                <div key={grupo.clienteId} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                  <button
-                    onClick={() => setExpandido((prev) => ({ ...prev, [grupo.clienteId]: !abierto }))}
-                    className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50"
-                  >
-                    <div>
-                      <p className="font-semibold text-slate-900">{grupo.clienteNombre}</p>
-                      <p className="text-xs text-slate-500">
-                        {grupo.clienteIdentificacion || '—'} · {grupo.clienteTelefono || '—'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
-                        {grupo.numeros.length} boleta{grupo.numeros.length !== 1 ? 's' : ''}
-                      </span>
-                      <svg className={`w-4 h-4 text-slate-400 transition-transform ${abierto ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                  </button>
-
-                  {abierto && (
-                    <div className="px-5 pb-5 border-t border-slate-100 pt-4">
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {grupo.numeros.map((n) => (
-                          <div
-                            key={n.id}
-                            className="group flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 pl-3 pr-1.5 py-1"
-                            title={n.ultima_aplicacion_en ? `Aplicada a ${n.ultima_aplicacion_rifa_nombre} · ${formatFecha(n.ultima_aplicacion_en)}` : 'Aún no aplicada'}
-                          >
-                            {editandoChip?.id === n.id ? (
-                              <input
-                                autoFocus
-                                type="number"
-                                min={0}
-                                max={9999}
-                                value={editandoChip.valor}
-                                onChange={(e) => setEditandoChip({ id: n.id, valor: e.target.value })}
-                                onKeyDown={(e) => e.key === 'Enter' && guardarEdicionChip()}
-                                onBlur={guardarEdicionChip}
-                                className="w-16 text-sm border border-indigo-300 rounded px-1 py-0.5"
-                              />
-                            ) : (
-                              <button
-                                onClick={() => setEditandoChip({ id: n.id, valor: String(n.numero_boleta) })}
-                                className="font-mono font-semibold text-sm text-slate-800 hover:text-indigo-600"
-                              >
-                                #{formatNumero(n.numero_boleta)}
-                              </button>
-                            )}
-                            {n.ultima_aplicacion_en && (
-                              <span className="text-[10px] text-blue-600 font-medium">✓</span>
-                            )}
-                            <button
-                              onClick={() => quitarNumero(n)}
-                              disabled={procesando === n.id}
-                              className="w-5 h-5 rounded-full flex items-center justify-center text-slate-400 hover:bg-red-100 hover:text-red-600 disabled:opacity-40"
-                              title="Quitar número"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ))}
-                        {grupo.numeros.length === 0 && (
-                          <p className="text-sm text-slate-400 italic">Sin números todavía. Agrega el primero abajo.</p>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min={0}
-                          max={9999}
-                          value={nuevoNumeroPorCliente[grupo.clienteId] || ''}
-                          onChange={(e) => setNuevoNumeroPorCliente((prev) => ({ ...prev, [grupo.clienteId]: e.target.value }))}
-                          onKeyDown={(e) => e.key === 'Enter' && agregarNumero(grupo.clienteId)}
-                          placeholder="Número de boleta"
-                          className="w-40 rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
-                        />
-                        <button
-                          onClick={() => agregarNumero(grupo.clienteId)}
-                          disabled={procesando === grupo.clienteId || !(nuevoNumeroPorCliente[grupo.clienteId] || '').trim()}
-                          className="px-3 py-1.5 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 font-medium"
-                        >
-                          {procesando === grupo.clienteId ? 'Agregando...' : '+ Agregar boleta'}
-                        </button>
-                        {grupo.numeros.length === 0 && grupo.clienteId !== SOLO_INVENTARIO_ID && (
-                          <button
-                            onClick={() => quitarClienteVacio(grupo.clienteId)}
-                            className="text-xs text-slate-400 hover:text-slate-600 ml-auto"
-                          >
-                            Cancelar
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+          renderListaGrupos(grupos, 'mi')
         )}
       </main>
 

@@ -9,6 +9,7 @@ export interface Preasignacion {
   notas: string | null
   creado_por: string | null
   creado_por_nombre: string | null
+  creado_por_rol: string | null
   ultima_aplicacion_rifa_id: string | null
   ultima_aplicacion_rifa_nombre: string | null
   ultima_aplicacion_venta_id: string | null
@@ -16,7 +17,6 @@ export interface Preasignacion {
   created_at: string
   updated_at: string
   cliente_nombre: string | null
-  creado_por_rol?: string | null
   cliente_telefono: string | null
   cliente_identificacion: string | null
   cliente_email: string | null
