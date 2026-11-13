@@ -74,6 +74,7 @@ function VendedorDetallePageContent({ params }: { params: Promise<{ id: string }
   const [rifaCuadriculaId, setRifaCuadriculaId] = useState('')
   const [cuadriculaBoletas, setCuadriculaBoletas] = useState([] as CuadriculaBoleta[])
   const [loadingCuadricula, setLoadingCuadricula] = useState(false)
+  const [mostrarContrasena, setMostrarContrasena] = useState(false)
 
   const esVendedor = data?.vendedor?.rol === 'VENDEDOR'
 
@@ -272,6 +273,43 @@ function VendedorDetallePageContent({ params }: { params: Promise<{ id: string }
                 <div className="mt-1 text-xs text-slate-400">
                   {data.vendedor.rol} · Último login {fmtDate(data.vendedor.ultimo_login)}
                 </div>
+                {Object.prototype.hasOwnProperty.call(data.vendedor, 'contrasena_acceso') && (
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 max-w-md">
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                      Contraseña de acceso
+                    </div>
+                    {data.vendedor.contrasena_acceso ? (
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <code className="text-sm font-mono text-slate-800 break-all">
+                          {mostrarContrasena
+                            ? data.vendedor.contrasena_acceso
+                            : '••••••••••••'}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={() => setMostrarContrasena((v) => !v)}
+                          className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                        >
+                          {mostrarContrasena ? 'Ocultar' : 'Mostrar'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void navigator.clipboard?.writeText(data.vendedor.contrasena_acceso || '')
+                          }}
+                          className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                        >
+                          Copiar
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-xs text-amber-800 leading-relaxed">
+                        No hay contraseña archivada (usuarios creados antes). En Equipo → Editar,
+                        asigna una contraseña nueva para guardarla aquí.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <span
                 className={`px-3 py-1 text-xs font-medium rounded-full ${data.vendedor.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}

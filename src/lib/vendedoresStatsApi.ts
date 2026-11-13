@@ -169,6 +169,8 @@ export interface VendedorDetalleResponse {
     ultimo_login: string | null
     created_at: string
     comision_porcentaje?: number
+    /** Solo SUPER_ADMIN: contraseña archivada al crear o al cambiar la clave */
+    contrasena_acceso?: string | null
   }
   resumen: VendedorDetalleResumen
   clientes: VendedorClienteRow[]
