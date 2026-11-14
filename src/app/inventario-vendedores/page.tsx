@@ -138,6 +138,7 @@ export default function InventarioVendedoresPage() {
   const [resumenAsignacion, setResumenAsignacion] = useState<AsignacionResumenData | null>(null)
   const [topeDraft, setTopeDraft] = useState<Record<string, string>>({})
   const [guardandoTope, setGuardandoTope] = useState<string | null>(null)
+  const [descargandoPdf, setDescargandoPdf] = useState<string | null>(null)
 
   const puedeGestionar = ['SUPER_ADMIN', 'ADMIN'].includes(
     (user?.rol || '').toUpperCase()
@@ -366,6 +367,20 @@ export default function InventarioVendedoresPage() {
     await cargarResumen()
     setDetalle(await inventarioApi.getDetalleVendedor(rifaId, vendedorAbierto))
   }, [rifaId, vendedorAbierto, cargarResumen])
+
+  const descargarInventario = async (v: InventarioVendedorResumen) => {
+    if (!rifaId || v.asignadas_total === 0) return
+    setDescargandoPdf(v.id)
+    setError('')
+    try {
+      await inventarioApi.descargarInventarioPdf(rifaId, v.id, v.nombre)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'No se pudo descargar el inventario'
+      setError(msg)
+    } finally {
+      setDescargandoPdf(null)
+    }
+  }
 
   const abrirDetalle = async (vendedorId: string) => {
     if (vendedorAbierto === vendedorId) {
@@ -1294,10 +1309,21 @@ export default function InventarioVendedoresPage() {
                         <td className="px-3 py-2">{v.abonadas}</td>
                         <td className="px-3 py-2">{v.pagadas}</td>
                         <td className="px-3 py-2 whitespace-nowrap">
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
                             <button onClick={() => abrirDetalle(v.id)} className={btnSecundario}>
                               {vendedorAbierto === v.id ? 'Cerrar' : 'Ver'}
                             </button>
+                            {v.asignadas_total > 0 && (
+                              <button
+                                type="button"
+                                disabled={descargandoPdf === v.id}
+                                onClick={() => descargarInventario(v)}
+                                className={btnSecundario}
+                                title="PDF con la cuadrícula de inventario (blanco=libre, verde=no disponible)"
+                              >
+                                {descargandoPdf === v.id ? '…' : 'Descargar inventario'}
+                              </button>
+                            )}
                             {puedeGestionar && v.asignadas_libres > 0 && (
                               <button
                                 onClick={() => confirmarVaciarVendedor(v)}

@@ -352,6 +352,49 @@ class InventarioApi {
     })
     return this.handle(res)
   }
+
+  async descargarInventarioPdf(
+    rifaId: string,
+    vendedorId: string,
+    nombreVendedor: string
+  ): Promise<void> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+    const res = await this.fetchWithTimeout(
+      `${BASE}/rifa/${rifaId}/vendedor/${vendedorId}/pdf`,
+      {
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      },
+      120000
+    )
+    if (!res.ok) {
+      let message = `Error ${res.status}`
+      try {
+        const data = await res.json()
+        if (data?.message) message = data.message
+      } catch {
+        /* respuesta no JSON */
+      }
+      throw new Error(message)
+    }
+    const blob = await res.blob()
+    const slug = nombreVendedor
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `inventario-${slug || 'vendedor'}.pdf`
+    a.rel = 'noopener'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
 }
 
 export const inventarioApi = new InventarioApi()
