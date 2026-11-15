@@ -325,6 +325,29 @@ main {
 
 }
 
+/* Cuadrícula 10×25: celdas anchas → números más grandes sin salirse */
+.cuadricula-cell {
+  container-type: size;
+  overflow: hidden;
+}
+
+.cuadricula-cell-num {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-size: max(8px, min(38cqw, 72cqh, 20px));
+}
+
+@supports not (container-type: size) {
+  .cuadricula-cell-num {
+    font-size: clamp(9px, 3.8vw, 20px);
+  }
+}
+
 /* ===== Buttons helpers ===== */
 .btn-primary {
   background: var(--primary);

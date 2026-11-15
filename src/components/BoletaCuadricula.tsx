@@ -26,8 +26,9 @@ interface BoletaCuadriculaProps {
   readOnly?: boolean
 }
 
-const PREFERRED_COLS = 12
-const MAX_SHEET_ROWS = 30
+/** Hoja inventario: 10 columnas × 25 filas (250 números), celdas anchas → números legibles. */
+const PREFERRED_COLS = 10
+const MAX_SHEET_ROWS = 25
 const CELLS_PER_SHEET = PREFERRED_COLS * MAX_SHEET_ROWS
 
 function chunkSheet<T>(items: T[], size: number): T[][] {
@@ -39,7 +40,7 @@ function chunkSheet<T>(items: T[], size: number): T[][] {
   return sheets
 }
 
-/** Hoja fija 12×30 cuando la página está llena; última hoja con menos números. */
+/** Hoja fija 10×25 cuando la página está llena; última hoja con menos números. */
 function layoutForSheet(countOnSheet: number) {
   const cols = PREFERRED_COLS
   if (countOnSheet >= CELLS_PER_SHEET) {
@@ -68,7 +69,7 @@ function cellStyles(boleta: CuadriculaBoleta) {
 }
 
 const cellBase =
-  'min-h-0 min-w-0 w-full h-full flex items-center justify-center font-mono font-semibold border-0 p-0 leading-none text-[clamp(5px,2.35vw,11px)] sm:text-[10px]'
+  'cuadricula-cell min-h-0 min-w-0 w-full h-full flex items-center justify-center font-mono font-bold border-0 p-0 leading-none'
 
 export default function BoletaCuadricula({
   boletas,
@@ -100,7 +101,7 @@ export default function BoletaCuadricula({
     () => layoutForSheet(sheetBoletas.length).rows,
     [sheetBoletas.length]
   )
-  /** Siempre 12×30 en pantalla: mismas celdas horizontales en todas las hojas. */
+  /** Siempre 10×25 en pantalla: mismas celdas en todas las hojas (mismo div contenedor). */
   const layout = useMemo(
     () => ({ cols: PREFERRED_COLS, rows: MAX_SHEET_ROWS, totalCells: CELLS_PER_SHEET }),
     [sheetBoletas.length]
@@ -162,7 +163,7 @@ export default function BoletaCuadricula({
       </div>
 
       <div className="flex-1 min-h-0 w-full overflow-hidden">
-        {/* 30 filas virtuales: misma altura de celda en todas las hojas (pocas boletas = rectángulo acostado). */}
+        {/* 25 filas fijas: misma altura de celda en todas las hojas. */}
         <div
           className="grid w-full h-full min-h-0"
           style={{
@@ -179,7 +180,9 @@ export default function BoletaCuadricula({
           >
             {cells.map((boleta, index) => {
               if (!boleta) {
-                return <div key={`empty-${index}`} className={`${cellBase} bg-white`} aria-hidden />
+                return (
+                  <div key={`empty-${index}`} className={`${cellBase} bg-white`} aria-hidden />
+                )
               }
 
               const displayNum = boleta.numero_principal ?? boleta.numero
@@ -188,7 +191,7 @@ export default function BoletaCuadricula({
               if (readOnly) {
                 return (
                   <div key={boleta.id} className={cellClass} title={title} aria-label={title}>
-                    {formatNumero(displayNum)}
+                    <span className="cuadricula-cell-num">{formatNumero(displayNum)}</span>
                   </div>
                 )
               }
@@ -200,7 +203,7 @@ export default function BoletaCuadricula({
                   className={cellClass}
                   title={title}
                 >
-                  {formatNumero(displayNum)}
+                  <span className="cuadricula-cell-num">{formatNumero(displayNum)}</span>
                 </button>
               )
             })}
