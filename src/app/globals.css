@@ -500,6 +500,13 @@ main {
   margin-bottom: 4px;
 }
 
+.boleta-ticket--oficial .boleta-ticket__abonado {
+  font-size: 9px;
+  font-weight: 700;
+  color: #15803d;
+  margin-bottom: 4px;
+}
+
 .boleta-ticket--oficial .boleta-ticket__right {
   flex-shrink: 0;
   position: relative;

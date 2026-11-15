@@ -638,6 +638,7 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
                       clienteInfo={{
                         nombre: venta.nombre,
                         identificacion: venta.cliente_identificacion,
+                        direccion: (venta as { cliente_direccion?: string }).cliente_direccion,
                       }}
                       deuda={b.saldo_pendiente_boleta ?? 0}
                       reservadaHasta={b.bloqueo_hasta}

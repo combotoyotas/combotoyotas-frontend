@@ -18,6 +18,7 @@ import {
   bonoAbonoLineFontPx,
   bonoAbonoLinesGapPx,
   formatMontoBono,
+  getAbonosActivosOrdenados,
   resolveBonoFooterDetalle,
 } from '@/utils/boletaBonoFooter'
 
@@ -33,8 +34,11 @@ interface BoletaTicketProps {
   clienteInfo?: {
     nombre: string
     identificacion?: string
+    direccion?: string | null
   } | null
   deuda?: number | string | null
+  /** Total abonado (si no se infiere de `abonos`). */
+  totalAbonado?: number | string | null
   reservadaHasta?: string | null
   precio?: number | null
   nota?: string | null
@@ -59,6 +63,7 @@ export default function BoletaTicket(props: BoletaTicketProps) {
     hideQr = false,
     hideIdentificacion = false,
     abonos = null,
+    totalAbonado: totalAbonadoProp = null,
   } = props
 
   const [imageError, setImageError] = useState(false)
@@ -93,7 +98,28 @@ export default function BoletaTicket(props: BoletaTicketProps) {
       : precio
         ? Number(String(precio).replace(/[^0-9.-]/g, '')) || null
         : null
-  const tieneCliente = Boolean(clienteInfo && (clienteInfo.nombre || clienteInfo.identificacion))
+  const tieneCliente = Boolean(
+    clienteInfo &&
+      (clienteInfo.nombre || clienteInfo.identificacion || clienteInfo.direccion)
+  )
+
+  const totalAbonadoNum = (() => {
+    if (totalAbonadoProp != null && totalAbonadoProp !== '') {
+      const n =
+        typeof totalAbonadoProp === 'number'
+          ? totalAbonadoProp
+          : Number(String(totalAbonadoProp).replace(/[^0-9.-]/g, '')) || 0
+      if (n > 0) return n
+    }
+    if (abonos?.length) {
+      const sum = getAbonosActivosOrdenados(abonos).reduce(
+        (s, a) => s + (Number(a.monto) || 0),
+        0
+      )
+      if (sum > 0) return sum
+    }
+    return null
+  })()
 
   const esReservada = estadoNorm === 'RESERVADA'
   const esCancelada = estadoNorm === 'ANULADA' || estadoNorm === 'CANCELADA'
@@ -174,7 +200,6 @@ export default function BoletaTicket(props: BoletaTicketProps) {
       >
         <div className="boleta-ticket__rules">
           <p>- Boleta sin pagar no juega</p>
-          <p>- 128 días de caducidad</p>
           <p>- Juega hasta quedar en</p>
           <p>&nbsp;&nbsp;poder del público</p>
         </div>
@@ -197,12 +222,18 @@ export default function BoletaTicket(props: BoletaTicketProps) {
           <p className="boleta-ticket__deuda">Deuda: ${deudaNum.toLocaleString('es-CO')}</p>
         )}
 
+        {esAbonada && totalAbonadoNum != null && totalAbonadoNum > 0 && (
+          <p className="boleta-ticket__abonado">
+            Abonó: ${totalAbonadoNum.toLocaleString('es-CO')}
+          </p>
+        )}
+
         {showCliente && (
           <div className="boleta-ticket__cliente">
             <p>A nombre de:</p>
             <p className="boleta-ticket__cliente-name">{clienteInfo?.nombre ?? '—'}</p>
             {!hideIdentificacion && (
-              <p>CC. {clienteInfo?.identificacion ?? '—'}</p>
+              <p>{(clienteInfo?.direccion ?? '').trim() || '—'}</p>
             )}
           </div>
         )}

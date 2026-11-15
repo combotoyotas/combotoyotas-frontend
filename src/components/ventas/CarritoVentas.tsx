@@ -558,7 +558,8 @@ export default function CarritoVentas({
                   }
                   clienteInfo={{
                     nombre: cliente.nombre,
-                    identificacion: cliente.identificacion
+                    identificacion: cliente.identificacion,
+                    direccion: cliente.direccion,
                   }}
                   deuda={
                     tipoVenta === 'RESERVA'

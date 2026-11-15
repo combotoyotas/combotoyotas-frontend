@@ -577,17 +577,32 @@ export default function BoletaList({
             (typeof saldoFin === 'number' && saldoFin <= 0 && !esReservada && !esAbonada && !esCancelada))
 
         let estadoHTML = ''
+        const ciudadCliente =
+          (boleta.cliente_info?.direccion ?? '').trim() || '—'
+        const bloqueCliente = () =>
+          `<div style="${BOLETA_BODY_TEXT}"><p style="margin:0">A nombre de:</p><p style="margin:0;font-weight:700">${boleta.cliente_info?.nombre ?? '—'}</p><p style="margin:0">${ciudadCliente}</p></div>`
+
         if (esCancelada) {
           estadoHTML = `<div style="${BOLETA_BADGE_STYLES.cancelada}">BOLETA CANCELADA</div><p style="${BOLETA_BODY_TEXT};font-weight:700;">Esta boleta no tiene validez</p>`
         } else if (esReservada && tieneCliente) {
-          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.reservada}">RESERVADA</div><div style="${BOLETA_BODY_TEXT}"><p style="margin:0">A nombre de:</p><p style="margin:0;font-weight:700">${boleta.cliente_info?.nombre ?? '—'}</p><p style="margin:0">CC. ${boleta.cliente_info?.identificacion ?? '—'}</p></div>`
+          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.reservada}">RESERVADA</div>${bloqueCliente()}`
         } else if (esReservada && !tieneCliente) {
           estadoHTML = `<div style="${BOLETA_BADGE_STYLES.bloqueada}">BLOQUEADA</div><p style="${BOLETA_BODY_TEXT}">Boleta bloqueada momentáneamente</p>`
         } else if (esPagada) {
-          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.pagada}">PAGADA</div><div style="${BOLETA_BODY_TEXT}"><p style="margin:0">A nombre de:</p><p style="margin:0;font-weight:700">${boleta.cliente_info?.nombre ?? '—'}</p><p style="margin:0">CC. ${boleta.cliente_info?.identificacion ?? '—'}</p></div>`
+          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.pagada}">PAGADA</div>${bloqueCliente()}`
         } else if (esAbonada) {
           const saldo = fin ? fin.saldo_pendiente : (precioNum ? precioNum : 0)
-          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.abonada}">ABONADA</div><p style="${BOLETA_BODY_TEXT};font-weight:700;color:#b45309">Deuda: $${saldo.toLocaleString('es-CO')}</p><div style="${BOLETA_BODY_TEXT}"><p style="margin:0">A nombre de:</p><p style="margin:0;font-weight:700">${boleta.cliente_info?.nombre ?? '—'}</p><p style="margin:0">CC. ${boleta.cliente_info?.identificacion ?? '—'}</p></div>`
+          let totalAb = fin?.total_pagado ?? 0
+          if (!totalAb && abonosMap[boleta.id]?.length) {
+            totalAb = abonosMap[boleta.id]
+              .filter((a) => (a.estado ?? '').toString().toUpperCase() !== 'ANULADO')
+              .reduce((s, a) => s + (Number(a.monto) || 0), 0)
+          }
+          const abonoLine =
+            totalAb > 0
+              ? `<p style="${BOLETA_BODY_TEXT};font-weight:700;color:#15803d;margin:0 0 4px">Abonó: $${totalAb.toLocaleString('es-CO')}</p>`
+              : ''
+          estadoHTML = `<div style="${BOLETA_BADGE_STYLES.abonada}">ABONADA</div><p style="${BOLETA_BODY_TEXT};font-weight:700;color:#b45309;margin:0 0 4px">Deuda: $${saldo.toLocaleString('es-CO')}</p>${abonoLine}${bloqueCliente()}`
         } else {
           estadoHTML = `<div style="${BOLETA_BADGE_STYLES.disponible}">DISPONIBLE</div>`
         }

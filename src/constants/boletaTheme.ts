@@ -11,7 +11,6 @@ export const BOLETA_BODY_TEXT =
 export const BOLETA_RULES_HTML = `
   <div style="font-size:9px;line-height:1.35;width:100%;margin-bottom:6px;text-align:center;">
     <p style="margin:0">- Boleta sin pagar no juega</p>
-    <p style="margin:0">- 128 días de caducidad</p>
     <p style="margin:0">- Juega hasta quedar en</p>
     <p style="margin:0">&nbsp;&nbsp;poder del público</p>
   </div>`

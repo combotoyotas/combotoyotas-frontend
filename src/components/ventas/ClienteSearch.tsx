@@ -70,6 +70,18 @@ export default function ClienteSearch({
   const [loadingSimilares, setLoadingSimilares] = useState(false)
   const [similaresOcultos, setSimilaresOcultos] = useState(false)
   const [terminoSimilar, setTerminoSimilar] = useState('')
+  const [esVendedor, setEsVendedor] = useState(false)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('user')
+      if (!raw) return
+      const user = JSON.parse(raw)
+      setEsVendedor(String(user?.rol || '').toUpperCase() === 'VENDEDOR')
+    } catch {
+      setEsVendedor(false)
+    }
+  }, [])
 
 
   useEffect(() => {
@@ -180,10 +192,12 @@ export default function ClienteSearch({
     setError(null)
 
     try {
+      const idTrim = clienteNuevo.identificacion?.trim()
       const payload = {
         ...clienteNuevo,
         email: clienteNuevo.email?.trim() || undefined,
         direccion: clienteNuevo.direccion?.trim() || undefined,
+        identificacion: idTrim || undefined,
       }
       const response = await ventasApi.crearCliente(payload)
       const nuevoCliente = response.data?.cliente ?? response.data
@@ -663,7 +677,12 @@ export default function ClienteSearch({
             </div>
             <div className="sm:col-span-2">
               <label className="block text-sm font-semibold text-slate-800 mb-2">
-                Cédula / identificación
+                Cédula / identificación{' '}
+                {esVendedor ? (
+                  <span className="text-slate-400 font-normal">(opcional)</span>
+                ) : (
+                  <span className="text-red-500">*</span>
+                )}
               </label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1">
@@ -692,7 +711,7 @@ export default function ClienteSearch({
             </div>
             <div className="sm:col-span-2">
               <label className="block text-sm font-semibold text-slate-800 mb-2">
-                Dirección <span className="text-slate-400 font-normal">(opcional)</span>
+                Ciudad / municipio <span className="text-slate-400 font-normal">(opcional)</span>
               </label>
               <div className="relative">
                 <MapPin className="absolute left-3 top-3 w-5 h-5 text-slate-400 pointer-events-none" />
@@ -701,7 +720,7 @@ export default function ClienteSearch({
                   onChange={(e) => setClienteNuevo({ ...clienteNuevo, direccion: e.target.value })}
                   rows={2}
                   className={`${inputClass} pl-10 min-h-[80px] py-3`}
-                  placeholder="Ciudad, barrio..."
+                  placeholder="Ej: Pereira, Dosquebradas..."
                 />
               </div>
             </div>
