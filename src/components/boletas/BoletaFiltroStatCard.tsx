@@ -1,6 +1,6 @@
 'use client'
 
-type Accent = 'emerald' | 'green' | 'blue' | 'orange'
+type Accent = 'emerald' | 'green' | 'blue' | 'orange' | 'amber'
 
 const ACCENT: Record<
   Accent,
@@ -32,6 +32,13 @@ const ACCENT: Record<
     active: 'border-orange-500 bg-orange-500 text-white shadow-md shadow-orange-500/25',
     activeRing: 'ring-2 ring-orange-400/50 ring-offset-1',
     countActive: 'text-white',
+    countInactive: 'text-slate-900',
+  },
+  amber: {
+    inactive: 'border-slate-200 bg-slate-50 text-slate-700 hover:border-amber-400 hover:bg-amber-50/80',
+    active: 'border-amber-500 bg-amber-400 text-black shadow-md shadow-amber-500/30',
+    activeRing: 'ring-2 ring-amber-400/55 ring-offset-1',
+    countActive: 'text-black',
     countInactive: 'text-slate-900',
   },
 }

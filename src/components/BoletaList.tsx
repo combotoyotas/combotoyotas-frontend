@@ -221,11 +221,12 @@ export default function BoletaList({
         const estadoRaw = boleta.estado?.toString().trim().toUpperCase() || ''
         if (boletaDisponibleParaVenta(boleta)) acc.disponibles++
         else if (estadoRaw === 'PAGADA' || estadoRaw === 'CON_PAGO') acc.vendidas++
+        else if (boletaEstaBloqueadaSinCliente(boleta)) acc.bloqueadas++
         else if (estadoRaw === 'RESERVADA' && boleta.cliente_info) acc.reservadas++
         else if (estadoRaw === 'ABONADA') acc.abonadas++
         return acc
       },
-      { disponibles: 0, vendidas: 0, reservadas: 0, abonadas: 0 }
+      { disponibles: 0, vendidas: 0, reservadas: 0, abonadas: 0, bloqueadas: 0 }
     )
   }, [boletas])
 
@@ -241,6 +242,7 @@ export default function BoletaList({
         if (filtroEstado === 'VENDIDAS') return estadoRaw === 'PAGADA' || estadoRaw === 'CON_PAGO'
         if (filtroEstado === 'RESERVADAS') return estadoRaw === 'RESERVADA' && boleta.cliente_info
         if (filtroEstado === 'ABONADAS') return estadoRaw === 'ABONADA'
+        if (filtroEstado === 'BLOQUEADAS') return boletaEstaBloqueadaSinCliente(boleta)
         return true
       })
     }
@@ -731,7 +733,7 @@ export default function BoletaList({
       </div> */}
 
       {/* Cards de Resumen - Clickeables como Filtros */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 min-w-0">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 min-w-0">
         <BoletaFiltroStatCard
           label="Disponibles"
           count={stats.disponibles}
@@ -769,6 +771,16 @@ export default function BoletaList({
           accent="orange"
           onClick={() => {
             setFiltroEstado(filtroEstado === 'ABONADAS' ? null : 'ABONADAS')
+            setCurrentPage(1)
+          }}
+        />
+        <BoletaFiltroStatCard
+          label="Bloqueadas"
+          count={stats.bloqueadas}
+          active={filtroEstado === 'BLOQUEADAS'}
+          accent="amber"
+          onClick={() => {
+            setFiltroEstado(filtroEstado === 'BLOQUEADAS' ? null : 'BLOQUEADAS')
             setCurrentPage(1)
           }}
         />
