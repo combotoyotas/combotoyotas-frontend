@@ -1,7 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Rifa, RifaCreateRequest, RifaUpdateRequest } from '@/types/rifa'
+import { rifaApi } from '@/lib/rifaApi'
+import { uploadApi } from '@/lib/uploadApi'
+import RifaPlantillaBoletaEditor from '@/components/rifas/RifaPlantillaBoletaEditor'
 
 interface RifaFormProps {
   rifa?: Rifa | null
@@ -22,6 +25,12 @@ export default function RifaForm({ rifa, onSubmit, onCancel }: RifaFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [precioFormateado, setPrecioFormateado] = useState('')
+  const [plantillaUrl, setPlantillaUrl] = useState('')
+  const [plantillaUrlInicial, setPlantillaUrlInicial] = useState('')
+  const [plantillaPreviewBlob, setPlantillaPreviewBlob] = useState<string | null>(null)
+  const [plantillaPendingFile, setPlantillaPendingFile] = useState<File | null>(null)
+  const [cargandoPlantilla, setCargandoPlantilla] = useState(false)
+  const plantillaLoadedFor = useRef<string | null>(null)
 
   // Función para formatear número a formato pesos colombianos
   const formatearPesos = (valor: number): string => {
@@ -52,7 +61,39 @@ export default function RifaForm({ rifa, onSubmit, onCancel }: RifaFormProps) {
         estado: rifa.estado
       })
       setPrecioFormateado(formatearPesos(precioBoleta))
+    } else {
+      plantillaLoadedFor.current = null
+      setPlantillaUrl('')
+      setPlantillaUrlInicial('')
+      setPlantillaPendingFile(null)
+      if (plantillaPreviewBlob?.startsWith('blob:')) {
+        URL.revokeObjectURL(plantillaPreviewBlob)
+      }
+      setPlantillaPreviewBlob(null)
     }
+  }, [rifa])
+
+  useEffect(() => {
+    if (!rifa?.id) return
+    if (plantillaLoadedFor.current === rifa.id) return
+    plantillaLoadedFor.current = rifa.id
+
+    const loadPlantilla = async () => {
+      setCargandoPlantilla(true)
+      try {
+        const res = await rifaApi.getRifaById(rifa.id)
+        const url = res.data.imagen_url?.trim() || rifa.imagen_url?.trim() || ''
+        setPlantillaUrl(url)
+        setPlantillaUrlInicial(url)
+      } catch {
+        const url = rifa.imagen_url?.trim() || ''
+        setPlantillaUrl(url)
+        setPlantillaUrlInicial(url)
+      } finally {
+        setCargandoPlantilla(false)
+      }
+    }
+    loadPlantilla()
   }, [rifa])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -136,7 +177,7 @@ export default function RifaForm({ rifa, onSubmit, onCancel }: RifaFormProps) {
 
     if (!formData.fecha_sorteo.trim()) {
       newErrors.fecha_sorteo = 'La fecha de sorteo es requerida'
-    } else {
+    } else if (!rifa) {
       const sorteoDate = new Date(formData.fecha_sorteo)
       const now = new Date()
       if (sorteoDate <= now) {
@@ -157,18 +198,38 @@ export default function RifaForm({ rifa, onSubmit, onCancel }: RifaFormProps) {
 
     setLoading(true)
     try {
-      // Formatear la fecha en formato ISO para el backend
       const submissionData = {
         ...formData,
         fecha_sorteo: new Date(formData.fecha_sorteo).toISOString()
       }
       
-      // Si estamos editando, eliminar total_boletas del objeto a enviar
       if (rifa) {
-        const { total_boletas, ...dataParaActualizar } = submissionData
-        await onSubmit(dataParaActualizar)
+        const { total_boletas, doble_oportunidad, ...dataParaActualizar } = submissionData
+
+        let imagenFinal = plantillaUrl.trim()
+        if (plantillaPendingFile) {
+          const upload = await uploadApi.uploadImagen(plantillaPendingFile)
+          imagenFinal = upload.url
+        }
+
+        const plantillaCambio =
+          plantillaPendingFile != null ||
+          imagenFinal !== plantillaUrlInicial.trim()
+
+        const payload: RifaUpdateRequest = {
+          titulo: dataParaActualizar.titulo,
+          descripcion: dataParaActualizar.descripcion,
+          precio_boleta: dataParaActualizar.precio_boleta,
+          fecha_sorteo: dataParaActualizar.fecha_sorteo,
+          estado: dataParaActualizar.estado,
+        }
+
+        if (plantillaCambio) {
+          payload.imagen_url = imagenFinal || null
+        }
+
+        await onSubmit(payload)
       } else {
-        // Si es creación, enviar todos los campos
         await onSubmit(submissionData)
       }
     } finally {
@@ -335,6 +396,25 @@ export default function RifaForm({ rifa, onSubmit, onCancel }: RifaFormProps) {
                 Este proyecto es de <strong>doble oportunidad</strong> (2 números por boleta).
               </div>
             </div>
+          )}
+
+          {rifa && (
+            cargandoPlantilla ? (
+              <div className="md:col-span-2 text-sm text-slate-500 py-4">Cargando plantilla de boleta…</div>
+            ) : (
+              <RifaPlantillaBoletaEditor
+                rifaId={rifa.id}
+                rifaTitulo={formData.titulo || rifa.nombre}
+                dobleOportunidad={rifa.doble_oportunidad}
+                imagenUrl={plantillaUrl}
+                onImagenUrlChange={setPlantillaUrl}
+                previewBlobUrl={plantillaPreviewBlob}
+                onPreviewBlobUrlChange={setPlantillaPreviewBlob}
+                pendingFile={plantillaPendingFile}
+                onPendingFileChange={setPlantillaPendingFile}
+                disabled={loading}
+              />
+            )
           )}
 
           <div>

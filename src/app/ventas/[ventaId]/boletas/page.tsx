@@ -10,6 +10,13 @@ import ResponsiveBoletaWrapper from '@/components/ResponsiveBoletaWrapper'
 import { downloadBoletaImage } from '@/utils/downloadBoletaImage'
 import { formatBoletaNumeros, normalizeNumeros } from '@/utils/formatBoletaNumeros'
 
+interface AbonoBoletaInfo {
+  id?: string
+  monto: number
+  fecha: string
+  estado?: string
+}
+
 interface BoletaInfo {
   id: string
   numero: number
@@ -21,6 +28,7 @@ interface BoletaInfo {
   qr_url?: string
   imagen_url?: string
   nota?: string | null
+  abonos?: AbonoBoletaInfo[]
 }
 
 export default function VentasBoletasPage() {
@@ -193,6 +201,7 @@ export default function VentasBoletasPage() {
                       deuda={boleta.saldo_pendiente_boleta}
                       precio={boleta.precio_boleta}
                       nota={boleta.nota}
+                      abonos={boleta.abonos}
                     />
                 </ResponsiveBoletaWrapper>
               </div>

@@ -35,6 +35,22 @@ const withPWA = withPWAInit({
         },
         handler: "NetworkOnly",
       },
+      {
+        urlPattern: ({ url, request }) =>
+          request.mode === "navigate" &&
+          (url.pathname.startsWith("/boletas/ver") ||
+            url.pathname.startsWith("/boletas/cuadricula") ||
+            url.pathname === "/login"),
+        handler: "NetworkFirst",
+        options: {
+          cacheName: "vendedor-boletas-shell",
+          networkTimeoutSeconds: 8,
+          expiration: {
+            maxEntries: 8,
+            maxAgeSeconds: 60 * 60 * 24 * 14,
+          },
+        },
+      },
     ],
   },
 });

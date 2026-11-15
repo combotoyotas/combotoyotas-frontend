@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState, useEffect } from 'react'
+import { Suspense, useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ventasApi } from '@/lib/ventasApi'
 import { boletaApi } from '@/lib/boletaApi'
@@ -14,7 +14,20 @@ import ClienteSeleccionado from '@/components/ventas/ClienteSeleccionado'
 import CarritoVentas from '@/components/ventas/CarritoVentas'
 import MisReservas from '@/components/ventas/MisReservas'
 import { RealTimeNotifications } from '@/components/ventas/RealTimeNotifications'
+import VentasMobileContinueFab from '@/components/ventas/VentasMobileContinueFab'
 import { useVentasRealTime } from '@/hooks/useWebSocket'
+import {
+  clearVentasAutoPrefillCache,
+  clearVentasNuevaDraft,
+  consumeVentasPrefillBoletaIds,
+  filterBoletasCarritoVigentes,
+  isBrowserFullReload,
+  loadVentasAutoPrefillCache,
+  loadVentasNuevaDraft,
+  saveVentasAutoPrefillCache,
+  saveVentasNuevaDraft,
+} from '@/lib/ventasNuevaDraft'
+import { setModuleLastPath } from '@/lib/moduleLastPath'
 
 // Componente temporal para SelectorRifa
 function SelectorRifa({ rifas, rifaSeleccionada, onRifaSeleccionada }: { 
@@ -65,6 +78,7 @@ function VentasPageContent() {
   const [rifaSeleccionada, setRifaSeleccionada] = useState<Rifa | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [avisoBoleta, setAvisoBoleta] = useState<string | null>(null)
   
   // Estado del flujo de ventas
   const [pasoActual, setPasoActual] = useState<'seleccionar-rifa' | 'seleccionar-boletas' | 'datos-cliente' | 'resumen'>('seleccionar-rifa')
@@ -78,6 +92,7 @@ function VentasPageContent() {
     direccion: '',
     identificacion: ''
   })
+  const draftRestoredRef = useRef(false)
 
   // WebSocket para actualizaciones en tiempo real
   const { eventosRecientes, conectado } = useVentasRealTime(
@@ -195,6 +210,8 @@ function VentasPageContent() {
 
   // Venta completada
   const handleVentaCompletada = () => {
+    clearVentasAutoPrefillCache()
+    clearVentasNuevaDraft()
     // Resetear estado
     setBoletasSeleccionadas([])
     setCliente({
@@ -237,52 +254,196 @@ function VentasPageContent() {
   )
 
   useEffect(() => {
+    if (isBrowserFullReload()) {
+      clearVentasAutoPrefillCache()
+    }
     cargarRifas()
+    setModuleLastPath('ventas', '/ventas/nueva-venta')
   }, [])
+
+  useEffect(() => {
+    if (loading || rifas.length === 0 || draftRestoredRef.current) return
+
+    const fullReload = isBrowserFullReload()
+    const autoVender = searchParams.get('auto') === '1'
+
+    if (autoVender && fullReload) {
+      draftRestoredRef.current = true
+      const rifaId = searchParams.get('rifa_id')
+      const qs = rifaId ? `?rifa_id=${encodeURIComponent(rifaId)}` : ''
+      router.replace(`/ventas/nueva-venta${qs}`, { scroll: false })
+      return
+    }
+
+    if (autoVender) {
+      draftRestoredRef.current = true
+      return
+    }
+
+    const draft = loadVentasNuevaDraft()
+    draftRestoredRef.current = true
+    if (!draft) return
+
+    if (draft.rifaId) {
+      const rifa = rifas.find((r) => r.id === draft.rifaId)
+      if (rifa) setRifaSeleccionada(rifa)
+    }
+    setCliente(draft.cliente)
+    setMostrarReservas(draft.mostrarReservas)
+
+    if (fullReload) {
+      setBoletasSeleccionadas([])
+      const paso =
+        draft.pasoActual === 'datos-cliente' || draft.pasoActual === 'resumen'
+          ? 'seleccionar-boletas'
+          : draft.pasoActual
+      setPasoActual(paso)
+      saveVentasNuevaDraft({
+        pasoActual: paso,
+        rifaId: draft.rifaId,
+        boletasSeleccionadas: [],
+        cliente: draft.cliente,
+        mostrarReservas: draft.mostrarReservas,
+      })
+      return
+    }
+
+    const vigentes = filterBoletasCarritoVigentes(draft.boletasSeleccionadas)
+    setBoletasSeleccionadas(vigentes)
+    const paso =
+      vigentes.length === 0 &&
+      (draft.pasoActual === 'datos-cliente' || draft.pasoActual === 'resumen')
+        ? 'seleccionar-boletas'
+        : draft.pasoActual
+    setPasoActual(paso)
+  }, [loading, rifas, searchParams, router])
+
+  useEffect(() => {
+    if (loading || !draftRestoredRef.current) return
+    saveVentasNuevaDraft({
+      pasoActual,
+      rifaId: rifaSeleccionada?.id ?? null,
+      boletasSeleccionadas,
+      cliente,
+      mostrarReservas,
+    })
+    setModuleLastPath('ventas', '/ventas/nueva-venta')
+  }, [
+    loading,
+    pasoActual,
+    rifaSeleccionada,
+    boletasSeleccionadas,
+    cliente,
+    mostrarReservas,
+  ])
 
   useEffect(() => {
     if (loading || prefillDesdeBoleta || rifas.length === 0) return
 
     const rifaId = searchParams.get('rifa_id')
-    const boletaId = searchParams.get('boleta_id')
-    if (searchParams.get('auto') !== '1' || !rifaId || !boletaId) return
+    if (searchParams.get('auto') !== '1' || !rifaId) return
+
+    const boletaIdParam = searchParams.get('boleta_id')
+    const source = searchParams.get('source')
+    let boletaIds: string[] = []
+    if (boletaIdParam) {
+      boletaIds = [boletaIdParam]
+    } else if (source === 'boletas-list') {
+      const prefillBulk = consumeVentasPrefillBoletaIds()
+      if (prefillBulk && prefillBulk.rifaId === rifaId) {
+        boletaIds = prefillBulk.boletaIds
+      }
+    }
+
+    if (boletaIds.length === 0) return
+
+    const prefillSignature = `auto:${rifaId}:${[...boletaIds].sort().join(',')}`
+    const cached = loadVentasAutoPrefillCache(prefillSignature)
+    if (cached) {
+      const rifaCached = rifas.find((r) => r.id === cached.rifaId)
+      if (rifaCached) {
+        setRifaSeleccionada(rifaCached)
+        setPasoActual('seleccionar-boletas')
+        setBoletasSeleccionadas(cached.boletas)
+        router.replace(
+          `/ventas/nueva-venta?rifa_id=${encodeURIComponent(rifaCached.id)}`,
+          { scroll: false }
+        )
+        setPrefillDesdeBoleta(true)
+        return
+      }
+    }
 
     const rifa = rifas.find((r) => r.id === rifaId)
     if (!rifa) {
-      setError('No se encontró el proyecto de la boleta')
+      setAvisoBoleta('No se encontró el proyecto de la boleta.')
       setPrefillDesdeBoleta(true)
       return
     }
 
+    const precio =
+      typeof rifa.precio_boleta === 'number'
+        ? rifa.precio_boleta
+        : parseFloat(String(rifa.precio_boleta || '0'))
+
     ;(async () => {
+      const bloqueadas: BoletaEnCarrito[] = []
+      const errores: string[] = []
       try {
+        clearVentasNuevaDraft()
+        setAvisoBoleta(null)
         setRifaSeleccionada(rifa)
         setPasoActual('seleccionar-boletas')
-        const detail = await boletaApi.getBoletaById(boletaId)
-        const b = detail.data
-        const precio =
-          typeof rifa.precio_boleta === 'number'
-            ? rifa.precio_boleta
-            : parseFloat(String(rifa.precio_boleta || '0'))
-        const nums = normalizeNumeros(b.numeros, b.numero)
-        const block = await ventasApi.bloquearBoleta(boletaId, 15, b.numero)
-        const bloqueo = block.data
-        const enCarrito: BoletaEnCarrito = {
-          id: b.id,
-          numero: b.numero,
-          numeros: nums,
-          numero_principal: b.numero,
-          precio,
-          reserva_token: bloqueo.reserva_token,
-          bloqueo_hasta: bloqueo.bloqueo_hasta,
-          qr_url: b.qr_url,
-          barcode: b.barcode,
-          imagen_url: b.imagen_url ?? undefined,
+        for (const boletaId of boletaIds) {
+          try {
+            const detail = await boletaApi.getBoletaById(boletaId)
+            const b = detail.data
+            const nums = normalizeNumeros(b.numeros, b.numero)
+            const block = await ventasApi.bloquearBoleta(boletaId, 15, b.numero)
+            const bloqueo = block.data
+            bloqueadas.push({
+              id: b.id,
+              numero: b.numero,
+              numeros: nums,
+              numero_principal: b.numero,
+              precio,
+              reserva_token: bloqueo.reserva_token,
+              bloqueo_hasta: bloqueo.bloqueo_hasta,
+              qr_url: b.qr_url,
+              barcode: b.barcode,
+              imagen_url: b.imagen_url ?? undefined,
+            })
+          } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : 'Error al bloquear'
+            errores.push(msg)
+          }
         }
-        setBoletasSeleccionadas([enCarrito])
-        setError(null)
+
+        if (bloqueadas.length > 0) {
+          bloqueadas.sort((a, b) => a.numero - b.numero)
+          setBoletasSeleccionadas(bloqueadas)
+          saveVentasAutoPrefillCache(prefillSignature, rifa.id, bloqueadas)
+          router.replace(
+            `/ventas/nueva-venta?rifa_id=${encodeURIComponent(rifa.id)}`,
+            { scroll: false }
+          )
+          setAvisoBoleta(
+            errores.length > 0
+              ? `Se agregaron ${bloqueadas.length} boleta(s). Otras no se pudieron bloquear: ${errores[0]}`
+              : null
+          )
+        } else {
+          setAvisoBoleta(
+            errores[0] ??
+              'No se pudo reservar la boleta automáticamente. Puedes buscarla y agregarla en el listado.'
+          )
+        }
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : 'No se pudo agregar la boleta al carrito de venta')
+        setAvisoBoleta(
+          e instanceof Error
+            ? e.message
+            : 'No se pudo agregar la boleta. Puedes seleccionarla manualmente abajo.'
+        )
       } finally {
         setPrefillDesdeBoleta(true)
       }
@@ -305,8 +466,18 @@ function VentasPageContent() {
     )
   }
 
+  const continuarBoletasLabel =
+    boletasSeleccionadas.length > 0
+      ? `Continuar (${boletasSeleccionadas.length} boleta${boletasSeleccionadas.length !== 1 ? 's' : ''})`
+      : 'Continuar'
+
   return (
     <div className="min-h-screen bg-slate-50">
+      <VentasMobileContinueFab
+        visible={pasoActual === 'seleccionar-boletas' && boletasSeleccionadas.length > 0}
+        label={continuarBoletasLabel}
+        onContinue={() => setPasoActual('datos-cliente')}
+      />
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
@@ -326,7 +497,15 @@ function VentasPageContent() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-28 sm:pb-8">
+      <main
+        className={`max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 lg:pb-8 ${
+          pasoActual === 'seleccionar-boletas' && boletasSeleccionadas.length > 0
+            ? 'pb-[calc(var(--tabbar-h)+var(--sab)+5rem)]'
+            : pasoActual === 'datos-cliente' || pasoActual === 'resumen'
+              ? 'pb-[calc(var(--tabbar-h)+var(--sab)+5rem)]'
+              : 'pb-28'
+        }`}
+      >
         {error ? (
           <div className="text-center py-12">
             <div className="inline-flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mb-4">
@@ -345,6 +524,14 @@ function VentasPageContent() {
           </div>
         ) : (
           <div className="space-y-8">
+            {avisoBoleta && (
+              <div
+                role="alert"
+                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+              >
+                {avisoBoleta}
+              </div>
+            )}
             {/* Indicador de paso actual */}
             <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2 mb-6 sm:mb-8 px-1">
               {[
@@ -417,34 +604,45 @@ function VentasPageContent() {
                   onBoletaSeleccionada={handleBoletaSeleccionada}
                   onBoletaRemovida={handleBoletaRemovida}
                   boletasSeleccionadas={boletasSeleccionadas}
+                  onContinuar={() => setPasoActual('datos-cliente')}
                 />
                 
-                {/* Navegación — sticky en móvil */}
-                <div className="fixed bottom-0 left-0 right-0 z-30 sm:static bg-white/95 sm:bg-transparent backdrop-blur-sm sm:backdrop-blur-none border-t sm:border-0 border-slate-200 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-0 sm:py-0">
-                  <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-2 sm:gap-0 max-w-7xl mx-auto">
+                {/* Navegación escritorio */}
+                <div className="hidden lg:flex justify-between items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={volverPasoAnterior}
+                    className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 min-h-[44px]"
+                  >
+                    ← Volver
+                  </button>
+                  {boletasSeleccionadas.length > 0 ? (
                     <button
-                      onClick={volverPasoAnterior}
-                      className="w-full sm:w-auto px-4 py-3 sm:py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 min-h-[48px]"
+                      type="button"
+                      onClick={() => setPasoActual('datos-cliente')}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 min-h-[44px] font-medium"
                     >
-                      ← Volver
+                      <span>
+                        Continuar ({boletasSeleccionadas.length} boleta
+                        {boletasSeleccionadas.length !== 1 ? 's' : ''})
+                      </span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                      </svg>
                     </button>
-                    
-                    {boletasSeleccionadas.length > 0 ? (
-                      <button
-                        onClick={() => setPasoActual('datos-cliente')}
-                        className="w-full sm:w-auto px-4 py-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 min-h-[48px] font-medium"
-                      >
-                        <span>Continuar ({boletasSeleccionadas.length} boleta{boletasSeleccionadas.length !== 1 ? 's' : ''})</span>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
-                    ) : (
-                      <p className="text-slate-500 text-sm text-center sm:text-right py-2">
-                        Selecciona al menos una boleta
-                      </p>
-                    )}
-                  </div>
+                  ) : (
+                    <p className="text-slate-500 text-sm">Selecciona al menos una boleta</p>
+                  )}
+                </div>
+
+                <div className="lg:hidden pt-1">
+                  <button
+                    type="button"
+                    onClick={volverPasoAnterior}
+                    className="text-sm text-slate-600 hover:text-slate-900 font-medium min-h-[44px] px-1"
+                  >
+                    ← Volver al proyecto
+                  </button>
                 </div>
               </div>
             )}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import VentasOnlineBanner from '@/components/ventasPublicas/VentasOnlineBanner'
+import { resolveVentasEntryHref } from '@/lib/ventasNavigation'
 
 interface User {
   id: string
@@ -28,7 +29,7 @@ export default function DashboardPage() {
   const canUseHistorial = normalizedRole === 'SUPER_ADMIN'
   const canUseSuperadminVentas = normalizedRole === 'SUPER_ADMIN'
   const canUsePreasignaciones = ['SUPER_ADMIN', 'ADMIN', 'VENDEDOR'].includes(normalizedRole || '')
-  const canUseInventario = ['SUPER_ADMIN', 'ADMIN'].includes(normalizedRole || '')
+  const canUseInventario = normalizedRole === 'SUPER_ADMIN'
   const canUseAjustes = normalizedRole === 'SUPER_ADMIN' || normalizedRole === 'VENDEDOR'
 
   useEffect(() => {
@@ -183,7 +184,7 @@ export default function DashboardPage() {
             {/* Ventas */}
             {canUseOperationalModules && (
               <a
-                href="/ventas"
+                href={resolveVentasEntryHref()}
                 className="group relative bg-gradient-to-br from-indigo-500 to-indigo-700 p-6 rounded-2xl text-white overflow-hidden card-hover shadow-lg shadow-indigo-600/15"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-8 translate-x-8" />

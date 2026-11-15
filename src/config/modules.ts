@@ -78,14 +78,14 @@ export const APP_MODULES: AppModule[] = [
     label: 'Vendedores',
     href: '/vendedores',
     matchPrefixes: ['/vendedores'],
-    roles: ['SUPER_ADMIN', 'ADMIN'],
+    roles: ['SUPER_ADMIN'],
   },
   {
     id: 'inventario-vendedores',
     label: 'Inventario vendedores',
     href: '/inventario-vendedores',
     matchPrefixes: ['/inventario-vendedores'],
-    roles: ['SUPER_ADMIN', 'ADMIN'],
+    roles: ['SUPER_ADMIN'],
   },
   {
     id: 'trueques',

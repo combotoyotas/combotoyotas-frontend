@@ -1,10 +1,30 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import PageHeader from '@/components/admin/PageHeader'
+import { resolveVentasEntryHref } from '@/lib/ventasNavigation'
 
 export default function VentasHomePage() {
   const router = useRouter()
+  const [showMenu, setShowMenu] = useState(false)
+
+  useEffect(() => {
+    const target = resolveVentasEntryHref()
+    if (target !== '/ventas') {
+      router.replace(target)
+      return
+    }
+    setShowMenu(true)
+  }, [router])
+
+  if (!showMenu) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center px-6 text-slate-500 text-sm">
+        Cargando ventas…
+      </div>
+    )
+  }
 
   return (
     <div className="px-3 sm:px-6 lg:px-8 py-4 sm:py-6">

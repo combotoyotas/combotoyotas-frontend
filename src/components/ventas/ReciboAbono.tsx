@@ -4,6 +4,7 @@ import { useRef } from 'react'
 import { generarWhatsAppChatLink } from '@/utils/telefono'
 import { WHATSAPP_VENTAS_ACTIVO } from '@/config/features'
 import { formatBoletaNumeros } from '@/utils/formatBoletaNumeros'
+import VentasCenteredOverlay from '@/components/ventas/VentasCenteredOverlay'
 
 // ─── Datos que necesita el recibo ───────────────────────────────────
 export interface ReciboAbonoData {
@@ -240,11 +241,88 @@ export default function ReciboAbono({ data, onClose, onWhatsApp }: ReciboAbonoPr
     }
   })()
 
+  const accionesFooter = (
+    <div className="no-print border-t border-slate-200 p-3 sm:p-4 space-y-2 bg-white rounded-b-2xl flex-shrink-0 shadow-[0_-8px_24px_rgb(15_23_42/0.08)]">
+      <button
+        type="button"
+        onClick={onClose}
+        className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold transition-colors shadow-sm min-h-[52px]"
+      >
+        Cerrar y continuar
+      </button>
+      <div className="grid grid-cols-2 gap-2">
+        {WHATSAPP_VENTAS_ACTIVO && whatsappLink ? (
+          <a
+            href={whatsappLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={onWhatsApp}
+            className="flex items-center justify-center gap-2 px-3 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-semibold text-sm min-h-[48px]"
+          >
+            {WHATSAPP_SVG}
+            WhatsApp
+          </a>
+        ) : (
+          <span />
+        )}
+        <button
+          type="button"
+          onClick={handleImprimir}
+          className="flex items-center justify-center gap-2 px-3 py-3 border-2 border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 font-medium text-sm min-h-[48px]"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          </svg>
+          Imprimir
+        </button>
+      </div>
+    </div>
+  )
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[100dvh] sm:max-h-[95vh] my-auto">
+    <VentasCenteredOverlay open onBackdropClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden"
+        style={{
+          maxHeight: 'min(90dvh, calc(100dvh - var(--tabbar-h) - var(--sab) - 1.25rem))',
+        }}
+      >
+        {/* Móvil: acciones primero sin scroll */}
+        <div className="sm:hidden flex-shrink-0 border-b border-slate-100 p-3 space-y-2 bg-slate-50/90">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full min-h-[52px] px-4 py-3 bg-blue-600 text-white rounded-xl font-semibold shadow-md active:scale-[0.99]"
+          >
+            Cerrar y continuar
+          </button>
+          <div className="grid grid-cols-2 gap-2">
+            {WHATSAPP_VENTAS_ACTIVO && whatsappLink ? (
+              <a
+                href={whatsappLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={onWhatsApp}
+                className="flex items-center justify-center gap-1.5 min-h-[48px] px-2 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold"
+              >
+                {WHATSAPP_SVG}
+                WhatsApp
+              </a>
+            ) : (
+              <span />
+            )}
+            <button
+              type="button"
+              onClick={handleImprimir}
+              className="min-h-[48px] px-2 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-800"
+            >
+              Imprimir
+            </button>
+          </div>
+        </div>
+
         {/* ── Contenido imprimible ── */}
-        <div ref={reciboRef} className="p-6 overflow-y-auto flex-1 min-h-0 overscroll-contain">
+        <div ref={reciboRef} className="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0 overscroll-contain">
           {/* Header */}
           <div className="recibo-header text-center border-b-2 border-dashed border-slate-300 pb-4 mb-4">
             <h1 className="text-xl font-bold text-slate-900">RECIBO DE PAGO</h1>
@@ -263,19 +341,19 @@ export default function ReciboAbono({ data, onClose, onWhatsApp }: ReciboAbonoPr
             )}
           </div>
 
-          {/* Ícono + título */}
-          <div className="text-center mb-4">
-            <div className="inline-flex items-center justify-center w-14 h-14 bg-green-100 rounded-full mb-3">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {/* Ícono + título (compacto en móvil) */}
+          <div className="text-center mb-3 sm:mb-4">
+            <div className="inline-flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 bg-green-100 rounded-full mb-2 sm:mb-3">
+              <svg className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h2 className="text-lg font-bold text-slate-900">{tituloRecibo}</h2>
-            <p className="text-sm text-slate-600 mt-1">{subtituloRecibo}</p>
+            <h2 className="text-base sm:text-lg font-bold text-slate-900">{tituloRecibo}</h2>
+            <p className="text-xs sm:text-sm text-slate-600 mt-0.5">{subtituloRecibo}</p>
           </div>
 
           {/* Monto grande */}
-          <div className="monto-grande text-center text-3xl font-extrabold text-green-600 py-3 border-2 border-green-200 rounded-xl bg-green-50 my-4">
+          <div className="monto-grande text-center text-2xl sm:text-3xl font-extrabold text-green-600 py-2.5 sm:py-3 border-2 border-green-200 rounded-xl bg-green-50 my-3 sm:my-4">
             {formatoMoneda(data.montoRegistrado)}
           </div>
 
@@ -366,7 +444,7 @@ export default function ReciboAbono({ data, onClose, onWhatsApp }: ReciboAbonoPr
               <p className="seccion-titulo text-[11px] font-bold uppercase text-slate-500 tracking-wide mb-2">
                 Boletas ({data.boletas.length})
               </p>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 max-h-28 sm:max-h-none overflow-y-auto pr-0.5">
                 {data.boletas.map((b, idx) => {
                   const pagada = b.estado === 'PAGADA' || (b.totalPagado && b.precioBoleta && b.totalPagado >= b.precioBoleta)
                   const abonada = !pagada && b.totalPagado && b.totalPagado > 0
@@ -397,44 +475,9 @@ export default function ReciboAbono({ data, onClose, onWhatsApp }: ReciboAbonoPr
           )}
         </div>
 
-        {/* ── Botones de acción (NO se imprimen) ── */}
-        <div className="no-print border-t border-slate-200 p-4 space-y-3 bg-slate-50 rounded-b-2xl flex-shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          {/* Imprimir */}
-          <button
-            type="button"
-            onClick={handleImprimir}
-            className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold transition-colors shadow-sm"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            Imprimir Recibo
-          </button>
-
-          {/* WhatsApp */}
-          {WHATSAPP_VENTAS_ACTIVO && whatsappLink && (
-            <a
-              href={whatsappLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={onWhatsApp}
-              className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-semibold transition-colors shadow-sm"
-            >
-              {WHATSAPP_SVG}
-              Abrir WhatsApp del cliente
-            </a>
-          )}
-
-          {/* Cerrar / Continuar */}
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full flex items-center justify-center gap-2 px-5 py-2.5 border-2 border-slate-300 text-slate-700 rounded-xl hover:bg-slate-100 font-medium transition-colors"
-          >
-            Cerrar y continuar
-          </button>
-        </div>
+        {/* Escritorio: pie con acciones (móvil ya tiene barra superior) */}
+        <div className="hidden sm:block">{accionesFooter}</div>
       </div>
-    </div>
+    </VentasCenteredOverlay>
   )
 }

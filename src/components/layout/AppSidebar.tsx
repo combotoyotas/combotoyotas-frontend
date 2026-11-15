@@ -32,6 +32,8 @@ import {
   isModuleActive,
   normalizeRole,
 } from '@/config/modules'
+import { clearModuleLastPaths, getModuleLastPath } from '@/lib/moduleLastPath'
+import { resolveVentasEntryHref } from '@/lib/ventasNavigation'
 import { TokenManager } from '@/utils/auth'
 import BrandLogo from '@/components/brand/BrandLogo'
 import { BRAND_NAME } from '@/config/brand'
@@ -77,10 +79,14 @@ function NavItem({
 }) {
   const active = isModuleActive(pathname, module)
   const Icon = MODULE_ICONS[module.id] ?? FileText
+  const href =
+    module.id === 'ventas'
+      ? resolveVentasEntryHref()
+      : getModuleLastPath(module.id, module.href)
 
   return (
     <Link
-      href={module.href}
+      href={href}
       onClick={onNavigate}
       className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 min-h-[44px] ${
         active
@@ -200,6 +206,7 @@ export default function AppSidebar({ user, mobileOpen, onMobileClose, overlayOnl
 
   const handleLogout = () => {
     TokenManager.clearAuthData()
+    clearModuleLastPaths()
     router.push('/login')
   }
 

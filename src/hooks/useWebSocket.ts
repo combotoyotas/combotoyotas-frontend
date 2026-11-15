@@ -29,6 +29,13 @@ export function useWebSocket({
       return
     }
 
+    const wsEnabled =
+      typeof process !== 'undefined' &&
+      process.env.NEXT_PUBLIC_WS_ENABLED === 'true'
+    if (!wsEnabled) {
+      return
+    }
+
     // Verificar si ya estamos conectados o si hemos excedido intentos
     if (reconnectAttempts.current >= maxReconnectAttempts) {
       console.log('WebSocket: Máximo de intentos alcanzado, desactivando reconexión')

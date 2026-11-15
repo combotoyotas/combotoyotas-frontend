@@ -181,7 +181,7 @@ export default function BoletaDetailPage() {
           </div>
         </div>
 
-        <BoletaDetailComponent boleta={boleta} onPrint={handlePrint} />
+        <BoletaDetailComponent boleta={boleta} onPrint={handlePrint} onBoletaUpdated={fetchBoletaDetail} />
       </main>
     </div>
   )

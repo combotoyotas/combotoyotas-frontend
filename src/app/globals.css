@@ -503,36 +503,128 @@ main {
   text-align: center;
 }
 
-.boleta-bono {
+/* Bono + número: dos cajas blancas separadas sobre el arte (% = ancho del panel derecho) */
+.boleta-bono-footer {
   position: absolute;
-  right: 6px;
-  bottom: 6px;
+  left: 0;
+  right: 0;
   z-index: 5;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid #111;
-  border-radius: 2px;
-  padding: 4px 6px 5px;
-  min-width: 88px;
-  text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: flex-end;
+  box-sizing: border-box;
+  pointer-events: none;
 }
 
-.boleta-bono__title {
-  font-size: 7px;
+.boleta-bono-footer__numero {
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+  padding: 0.2em 0.35em;
+  color: #111;
+  line-height: 1.1;
+  min-width: 0;
+}
+
+.boleta-bono-footer__numero-principal {
+  font-size: 1.22em;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  max-width: 100%;
+}
+
+.boleta-bono-footer__numero-regalo {
+  font-size: 0.62em;
+  font-weight: 700;
+  margin-top: 0.1em;
+}
+
+.boleta-bono-footer__bono {
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  box-sizing: border-box;
+  padding: 0.38em 0.55em 0.3em 0.62em;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.boleta-bono-footer__bono-title {
+  flex: 0 0 auto;
+  font-size: 0.68em;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
-  line-height: 1.2;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
   color: #111;
+  text-align: left;
+  width: 100%;
 }
 
-.boleta-bono__value {
-  font-size: 10px;
+.boleta-bono-footer__bono-abonos {
+  margin-top: 0.1em;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  justify-content: flex-start;
+}
+
+.boleta-bono-footer__bono--abonos-3 .boleta-bono-footer__bono-title,
+.boleta-bono-footer__bono--abonos-4 .boleta-bono-footer__bono-title {
+  font-size: 0.6em;
+  line-height: 1.1;
+}
+
+.boleta-bono-footer__bono--abonos-4 {
+  padding-top: 0.32em;
+  padding-bottom: 0.22em;
+}
+
+.boleta-bono-footer__bono-abono-linea {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 0.28em;
   font-weight: 800;
-  margin-top: 2px;
-  color: #737373;
+  color: #111;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
-.boleta-bono__value.is-cancelado {
+.boleta-bono-footer__bono-abono-sep {
+  opacity: 0.65;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.boleta-bono-footer__bono--cancelado {
+  padding-bottom: 0.15em;
+}
+
+.boleta-bono-footer__bono-estado {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  width: 100%;
+  min-height: 0;
+  margin-top: 0.02em;
+  padding: 0 0.15em 0.08em;
+  font-weight: 800;
   color: #15803d;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-align: center;
 }

@@ -4,6 +4,7 @@ export interface ClienteInfo {
   email: string
   telefono: string
   identificacion: string
+  direccion?: string | null
 }
 
 export interface VendedorInfo {
@@ -22,6 +23,7 @@ export interface Boleta {
   id: string
   numero: number
   numeros?: number[]
+  venta_id?: string | null
   estado: string
   qr_url: string | null
   barcode: string | null
@@ -31,6 +33,7 @@ export interface Boleta {
   tiene_cliente: boolean
   tipo_estado: 'DISPONIBLE' | 'RESERVADA' | 'CON_PAGO' | 'TRANSFERIDA' | 'ANULADA'
   bloqueo_hasta?: string | null
+  reserva_token?: string | null
   imagen_url?: string | null
   nota?: string | null
 }

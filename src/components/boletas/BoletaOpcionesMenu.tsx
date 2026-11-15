@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { boletaApi } from '@/lib/boletaApi'
+import type { BoletaDetail } from '@/types/boleta'
 import { createPortal } from 'react-dom'
 import type { Boleta } from '@/types/boleta'
 import type { Rifa } from '@/types/rifa'
@@ -11,7 +13,9 @@ import { WHATSAPP_MENSAJE_ACTIVO, WHATSAPP_VENTAS_ACTIVO } from '@/config/featur
 import {
   abrirWhatsappRecordatorioBoleta,
   boletaEstaDisponibleParaVender,
+  boletaPuedeAbonarse,
   tipoRecordatorioBoleta,
+  urlAbonarBoleta,
   urlVenderBoleta,
 } from '@/lib/boletaWhatsappAcciones'
 
@@ -38,6 +42,7 @@ type Props = {
   onEditarNota?: () => void
   rifaId?: string | null
   onIrAVender?: (href: string) => void
+  onIrAAbonar?: (href: string) => void
   /** En móvil: bottom sheet; en desktop: popover anclado */
   mode?: 'sheet' | 'popover'
   anchorEl?: HTMLElement | null
@@ -93,6 +98,7 @@ export function buildBoletaMenuActions(props: {
   onImprimir: () => void
   onEditarNota?: () => void
   onIrAVender?: (href: string) => void
+  onIrAAbonar?: (href: string) => void
   onClose: () => void
 }): BoletaMenuAction[] {
   const {
@@ -104,6 +110,7 @@ export function buildBoletaMenuActions(props: {
     onImprimir,
     onEditarNota,
     onIrAVender,
+    onIrAAbonar,
     onClose,
   } = props
 
@@ -122,6 +129,26 @@ export function buildBoletaMenuActions(props: {
       onClick: () => {
         const href = urlVenderBoleta(rifaId, boleta.id)
         if (onIrAVender) onIrAVender(href)
+        else if (typeof window !== 'undefined') window.location.href = href
+        onClose()
+      },
+    })
+  }
+
+  if (boletaPuedeAbonarse(boleta)) {
+    actions.push({
+      id: 'abonar',
+      label: 'Abonar',
+      tone: 'success',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      onClick: () => {
+        const href = urlAbonarBoleta(boleta, rifaId)
+        const go = onIrAAbonar ?? onIrAVender
+        if (go) go(href)
         else if (typeof window !== 'undefined') window.location.href = href
         onClose()
       },
@@ -202,6 +229,117 @@ export function buildBoletaMenuActions(props: {
   return actions
 }
 
+const formatCop = (value: number) =>
+  new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value)
+
+function InfoRow({ label, value, alwaysShow = false }: { label: string; value: string; alwaysShow?: boolean }) {
+  const display = value?.trim() || (alwaysShow ? '—' : '')
+  if (!display) return null
+  return (
+    <div className="flex justify-between gap-3 text-sm py-0.5">
+      <span className="text-slate-500 shrink-0">{label}</span>
+      <span className="text-slate-900 font-medium text-right break-words">{display}</span>
+    </div>
+  )
+}
+
+function BoletaMenuContexto({ open, boleta }: { open: boolean; boleta: Boleta }) {
+  const [detail, setDetail] = useState<BoletaDetail | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!open) {
+      setDetail(null)
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    boletaApi
+      .getBoletaById(boleta.id)
+      .then((r) => {
+        if (!cancelled) setDetail(r.data)
+      })
+      .catch(() => {
+        if (!cancelled) setDetail(null)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, boleta.id])
+
+  const cliente = detail?.cliente_info ?? boleta.cliente_info
+  const estadoRaw = String(detail?.estado ?? boleta.estado ?? '').toUpperCase()
+  const fin = detail?.boleta_financiero
+  const tieneCliente = Boolean(cliente?.nombre || cliente?.telefono || cliente?.identificacion)
+  const muestraFin = tieneCliente && estadoRaw !== 'DISPONIBLE'
+
+  if (loading) {
+    return (
+      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
+        <p className="text-sm text-slate-500 animate-pulse">Cargando datos del cliente…</p>
+      </div>
+    )
+  }
+
+  const precio = fin?.precio_boleta ?? 0
+  const pagado = fin?.total_pagado ?? 0
+  const saldo =
+    fin != null
+      ? fin.saldo_pendiente
+      : estadoRaw === 'PAGADA' || estadoRaw === 'CON_PAGO'
+        ? 0
+        : null
+
+  return (
+    <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80 space-y-3">
+      {tieneCliente ? (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Cliente</p>
+          {cliente?.nombre && (
+            <p className="text-sm font-semibold text-slate-900 mb-1">{cliente.nombre}</p>
+          )}
+          <InfoRow label="Teléfono" value={cliente?.telefono || ''} alwaysShow />
+          <InfoRow label="Cédula" value={cliente?.identificacion || ''} alwaysShow />
+          <InfoRow label="De dónde es" value={cliente?.direccion || ''} alwaysShow />
+        </div>
+      ) : (
+        <p className="text-sm text-slate-600">Sin cliente asignado en esta boleta.</p>
+      )}
+
+      {muestraFin && (
+        <div className="rounded-lg border border-slate-200 bg-white p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Saldo de la boleta</p>
+          <div className="space-y-1">
+            <InfoRow label="Valor boleta" value={formatCop(precio)} />
+            <InfoRow label="Abonado" value={formatCop(pagado)} />
+            <div className="flex justify-between gap-3 text-sm pt-1 border-t border-slate-100 mt-1">
+              <span className="text-slate-600 font-medium">Resta por pagar</span>
+              <span
+                className={`font-bold ${
+                  saldo != null && saldo <= 0 ? 'text-green-600' : 'text-orange-600'
+                }`}
+              >
+                {saldo != null ? formatCop(saldo) : '—'}
+              </span>
+            </div>
+            {saldo != null && saldo <= 0 && (
+              <p className="text-xs text-green-700 font-semibold mt-1">Pagada — sin saldo pendiente</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function MenuList({
   titleId,
   boleta,
@@ -263,6 +401,7 @@ export default function BoletaOpcionesMenu({
   onEditarNota,
   rifaId = null,
   onIrAVender,
+  onIrAAbonar,
   mode = 'sheet',
   anchorEl = null,
 }: Props) {
@@ -296,6 +435,7 @@ export default function BoletaOpcionesMenu({
     onImprimir,
     onEditarNota,
     onIrAVender,
+    onIrAAbonar,
     onClose,
   })
 
@@ -319,7 +459,7 @@ export default function BoletaOpcionesMenu({
           onClick={onClose}
         />
         <div
-          className="fixed z-50 w-72 max-w-[calc(100vw-1rem)] rounded-xl border border-slate-200 bg-white shadow-xl"
+          className="fixed z-50 w-[min(100vw-1rem,20rem)] max-h-[min(85vh,560px)] flex flex-col rounded-xl border border-slate-200 bg-white shadow-xl overflow-hidden"
           style={{ top, right }}
           role="dialog"
           aria-labelledby={titleId}
@@ -329,8 +469,16 @@ export default function BoletaOpcionesMenu({
               Boleta {numeroLabel}
             </p>
             <p className="text-xs text-slate-500 truncate">{subtitulo}</p>
+            <span
+              className={`inline-flex mt-2 px-2 py-0.5 text-[10px] font-bold rounded-full ${estadoInfo.classes}`}
+            >
+              {estadoInfo.label}
+            </span>
           </div>
-          <MenuList titleId={titleId} boleta={boleta} actions={actions} onClose={onClose} />
+          <div className="overflow-y-auto overscroll-contain flex-1 min-h-0">
+            <BoletaMenuContexto open={open} boleta={boleta} />
+            <MenuList titleId={titleId} boleta={boleta} actions={actions} onClose={onClose} />
+          </div>
         </div>
       </>,
       document.body
@@ -367,7 +515,8 @@ export default function BoletaOpcionesMenu({
             {estadoInfo.label}
           </span>
         </div>
-        <div className="overflow-y-auto overscroll-contain">
+        <div className="overflow-y-auto overscroll-contain max-h-[min(50vh,360px)]">
+          <BoletaMenuContexto open={open} boleta={boleta} />
           <MenuList titleId={titleId} boleta={boleta} actions={actions} onClose={onClose} />
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import InventarioCuadriculaEncabezado from '@/components/InventarioCuadriculaEncabezado'
 
 export type CuadriculaBoleta = {
   id: string
@@ -21,6 +22,8 @@ interface BoletaCuadriculaProps {
   alcance?: Alcance
   vendedorNombre?: string | null
   loading?: boolean
+  /** Sin ir al detalle (modo offline vendedor). */
+  readOnly?: boolean
 }
 
 const PREFERRED_COLS = 12
@@ -73,6 +76,7 @@ export default function BoletaCuadricula({
   alcance,
   vendedorNombre,
   loading,
+  readOnly = false,
 }: BoletaCuadriculaProps) {
   const router = useRouter()
 
@@ -92,7 +96,15 @@ export default function BoletaCuadricula({
   const safeSheetIndex = Math.min(sheetIndex, Math.max(0, sheets.length - 1))
   const sheetBoletas = sheets[safeSheetIndex] || []
 
-  const layout = useMemo(() => layoutForSheet(sheetBoletas.length), [sheetBoletas.length])
+  const dataRows = useMemo(
+    () => layoutForSheet(sheetBoletas.length).rows,
+    [sheetBoletas.length]
+  )
+  /** Siempre 12×30 en pantalla: mismas celdas horizontales en todas las hojas. */
+  const layout = useMemo(
+    () => ({ cols: PREFERRED_COLS, rows: MAX_SHEET_ROWS, totalCells: CELLS_PER_SHEET }),
+    [sheetBoletas.length]
+  )
 
   const cells = useMemo(() => {
     const list: Array<CuadriculaBoleta | null> = sheetBoletas.map((b) => b)
@@ -101,9 +113,6 @@ export default function BoletaCuadricula({
     }
     return list
   }, [sheetBoletas, layout.totalCells])
-
-  const alcanceShort =
-    alcance === 'inventario_vendedor' ? 'Inv.' : alcance === 'pool_libre' ? 'Pool' : 'Todas'
 
   if (loading) {
     return (
@@ -116,12 +125,12 @@ export default function BoletaCuadricula({
 
   return (
     <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden">
-      <div className="shrink-0 flex items-center justify-between gap-1 px-0.5 py-0.5 text-[9px] sm:text-[10px] text-slate-600 border-b border-slate-100">
-        <span className="truncate font-semibold text-slate-800 min-w-0">
-          {rifaNombre || 'Proyecto'}
-        </span>
-        <span className="shrink-0 tabular-nums">
-          {alcanceShort} · {layout.cols}×{layout.rows}
+      <InventarioCuadriculaEncabezado rifaNombre={rifaNombre} vendedorNombre={vendedorNombre} />
+
+      <div className="shrink-0 flex items-center justify-between gap-1 px-1 py-0.5 text-[8px] sm:text-[9px] text-slate-500 border-b border-slate-100 bg-slate-50/80">
+        <span className="shrink-0 tabular-nums text-slate-600">
+          {layout.cols}×{layout.rows}
+          {dataRows < MAX_SHEET_ROWS ? ` · ${dataRows} núm.` : ''}
         </span>
         {sheets.length > 1 ? (
           <span className="shrink-0 flex items-center gap-0.5">
@@ -134,8 +143,8 @@ export default function BoletaCuadricula({
             >
               ←
             </button>
-            <span className="font-mono">
-              {safeSheetIndex + 1}/{sheets.length}
+            <span className="font-mono text-slate-700">
+              Hoja {safeSheetIndex + 1}/{sheets.length}
             </span>
             <button
               type="button"
@@ -153,31 +162,49 @@ export default function BoletaCuadricula({
       </div>
 
       <div className="flex-1 min-h-0 w-full overflow-hidden">
+        {/* 30 filas virtuales: misma altura de celda en todas las hojas (pocas boletas = rectángulo acostado). */}
         <div
-          className="grid gap-px bg-slate-400 border border-slate-400 overflow-hidden w-full h-full min-h-0"
+          className="grid w-full h-full min-h-0"
           style={{
-            gridTemplateColumns: `repeat(${layout.cols}, minmax(0, 1fr))`,
-            gridTemplateRows: `repeat(${layout.rows}, minmax(0, 1fr))`,
+            gridTemplateRows: `repeat(${MAX_SHEET_ROWS}, minmax(0, 1fr))`,
           }}
         >
-          {cells.map((boleta, index) => {
-            if (!boleta) {
-              return <div key={`empty-${index}`} className={`${cellBase} bg-white`} aria-hidden />
-            }
+          <div
+            className="grid gap-px bg-slate-400 border border-slate-400 overflow-hidden w-full min-h-0 min-w-0"
+            style={{
+              gridRow: `1 / span ${MAX_SHEET_ROWS}`,
+              gridTemplateColumns: `repeat(${layout.cols}, minmax(0, 1fr))`,
+              gridTemplateRows: `repeat(${MAX_SHEET_ROWS}, minmax(0, 1fr))`,
+            }}
+          >
+            {cells.map((boleta, index) => {
+              if (!boleta) {
+                return <div key={`empty-${index}`} className={`${cellBase} bg-white`} aria-hidden />
+              }
 
-            const displayNum = boleta.numero_principal ?? boleta.numero
-            return (
-              <button
-                key={boleta.id}
-                type="button"
-                onClick={() => router.push(`/boletas/${boleta.id}`)}
-                className={`${cellBase} transition-colors active:opacity-80 ${cellStyles(boleta)}`}
-                title={`#${formatNumero(displayNum)} · ${boleta.estado}`}
-              >
-                {formatNumero(displayNum)}
-              </button>
-            )
-          })}
+              const displayNum = boleta.numero_principal ?? boleta.numero
+              const cellClass = `${cellBase} ${readOnly ? '' : 'transition-colors active:opacity-80'} ${cellStyles(boleta)}`
+              const title = `#${formatNumero(displayNum)} · ${boleta.estado}`
+              if (readOnly) {
+                return (
+                  <div key={boleta.id} className={cellClass} title={title} aria-label={title}>
+                    {formatNumero(displayNum)}
+                  </div>
+                )
+              }
+              return (
+                <button
+                  key={boleta.id}
+                  type="button"
+                  onClick={() => router.push(`/boletas/${boleta.id}`)}
+                  className={cellClass}
+                  title={title}
+                >
+                  {formatNumero(displayNum)}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
 

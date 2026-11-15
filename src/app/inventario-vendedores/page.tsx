@@ -140,9 +140,7 @@ export default function InventarioVendedoresPage() {
   const [guardandoTope, setGuardandoTope] = useState<string | null>(null)
   const [descargandoPdf, setDescargandoPdf] = useState<string | null>(null)
 
-  const puedeGestionar = ['SUPER_ADMIN', 'ADMIN'].includes(
-    (user?.rol || '').toUpperCase()
-  )
+  const puedeGestionar = (user?.rol || '').toUpperCase() === 'SUPER_ADMIN'
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -153,8 +151,8 @@ export default function InventarioVendedoresPage() {
     }
     try {
       const parsed = JSON.parse(userData)
-      if (!['SUPER_ADMIN', 'ADMIN'].includes((parsed.rol || '').toUpperCase())) {
-        router.push('/mis-reportes')
+      if ((parsed.rol || '').toUpperCase() !== 'SUPER_ADMIN') {
+        router.push('/dashboard')
         return
       }
       setUser(parsed)

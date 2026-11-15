@@ -13,9 +13,7 @@ interface SelectorBoletasProps {
   onBoletaSeleccionada: (boleta: BoletaEnCarrito) => void
   onBoletaRemovida: (boletaId: string) => void
   boletasSeleccionadas: BoletaEnCarrito[]
-
-
-  
+  onContinuar?: () => void
 }
 
 
@@ -26,7 +24,8 @@ export default function SelectorBoletas({
   precioBoleta, 
   onBoletaSeleccionada, 
   onBoletaRemovida,
-  boletasSeleccionadas 
+  boletasSeleccionadas,
+  onContinuar,
 }: SelectorBoletasProps) {
   const [boletasDisponibles, setBoletasDisponibles] = useState<BoletaDisponible[]>([])
   const [loading, setLoading] = useState(false)
@@ -62,6 +61,7 @@ export default function SelectorBoletas({
   const [boletaNoExiste, setBoletaNoExiste] = useState(false)
   const [buscandoExacta, setBuscandoExacta] = useState(false)
   const intervalosRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map())
+  const removiendoRef = useRef<Set<string>>(new Set())
   const seleccionadasIdsRef = useRef<Set<string>>(new Set())
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const busquedaExactaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -231,17 +231,17 @@ export default function SelectorBoletas({
 
   // Remover boleta del carrito y desbloquear
   const removerBoleta = async (boleta: BoletaEnCarrito) => {
+    if (removiendoRef.current.has(boleta.id)) return
+    removiendoRef.current.add(boleta.id)
     try {
-      await ventasApi.desbloquearBoleta(boleta.id, boleta.reserva_token)
-      
-    const interval = intervalosRef.current.get(boleta.id)
-if (interval) {
-  clearInterval(interval)
-  intervalosRef.current.delete(boleta.id)
-}
+      await ventasApi.desbloquearBoletaDelCarrito(boleta.id, boleta.reserva_token)
 
+      const interval = intervalosRef.current.get(boleta.id)
+      if (interval) {
+        clearInterval(interval)
+        intervalosRef.current.delete(boleta.id)
+      }
 
-      // Devolver a disponibles
       const boletaDisponible: BoletaDisponible = {
         id: boleta.id,
         numero: boleta.numero,
@@ -250,16 +250,22 @@ if (interval) {
         qr_url: boleta.qr_url,
         barcode: boleta.barcode,
         imagen_url: boleta.imagen_url,
-        rifa_nombre: '', // No disponible en este contexto
+        rifa_nombre: '',
         rifa_id: rifaId,
         precio: precioBoleta,
       }
-      
-      setBoletasDisponibles(prev => [...prev, boletaDisponible])
+
+      setBoletasDisponibles((prev) => {
+        if (prev.some((b) => b.id === boleta.id)) return prev
+        return [...prev, boletaDisponible]
+      })
       onBoletaRemovida(boleta.id)
-      
+      void cargarBoletasDisponibles({ silent: true })
     } catch (error) {
-      console.error('Error desbloqueando boleta:', error)
+      const msg = error instanceof Error ? error.message : 'No se pudo quitar la boleta'
+      setError(msg)
+    } finally {
+      removiendoRef.current.delete(boleta.id)
     }
   }
 
@@ -522,24 +528,11 @@ if (interval) {
 
 
   useEffect(() => {
-  return () => {
-    if (boletasSeleccionadas.length > 0) {
-      ventasApi.liberarBloqueosMultiples(
-        boletasSeleccionadas.map(b => ({
-          id: b.id,
-          reserva_token: b.reserva_token
-        }))
-      )
+    return () => {
+      intervalosRef.current.forEach((interval) => clearInterval(interval))
+      intervalosRef.current.clear()
     }
-
-    // limpiar todos los intervalos
-    intervalosRef.current.forEach(interval => {
-      clearInterval(interval)
-    })
-
-    intervalosRef.current.clear()
-  }
-}, [])
+  }, [])
 
 
 useEffect(() => {
@@ -642,9 +635,20 @@ useEffect(() => {
       {/* Boletas Seleccionadas — primero para evitar confusión al buscar */}
       {boletasSeleccionadas.length > 0 && (
         <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h3 className="text-sm font-medium text-blue-900 mb-3">
-            Tu selección ({boletasSeleccionadas.length})
-          </h3>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <h3 className="text-sm font-medium text-blue-900">
+              Tu selección ({boletasSeleccionadas.length})
+            </h3>
+            {onContinuar && (
+              <button
+                type="button"
+                onClick={onContinuar}
+                className="lg:hidden shrink-0 min-h-[44px] px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-md hover:bg-blue-700 active:scale-[0.98]"
+              >
+                Continuar →
+              </button>
+            )}
+          </div>
           {feedbackPrincipal && (
             <div className="mb-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
               ✓ Agregaste: {feedbackPrincipal}

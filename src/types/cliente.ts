@@ -20,6 +20,8 @@ export interface Cliente {
   creado_por?: string | null
   creado_por_etiqueta?: string | null
   creado_por_rol?: string | null
+  ultima_notificacion?: string | null
+  total_notificaciones?: number
 }
 
 export interface ClienteCreateRequest {

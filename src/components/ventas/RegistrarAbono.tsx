@@ -16,6 +16,7 @@ import PrincipalGiftLabel from '@/components/ventas/PrincipalGiftLabel'
 import { formatRegistradoConRol } from '@/utils/formatAbonoRegistradoPor'
 import { ajustesApi, type LineaVentaItem, type MedioPagoItem } from '@/lib/ajustesApi'
 import { TokenManager } from '@/utils/auth'
+import VentasMobileActionBar from '@/components/ventas/VentasMobileActionBar'
 
 interface Props {
   ventaId: string
@@ -642,6 +643,7 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
                       reservadaHasta={b.bloqueo_hasta}
                       precio={b.precio_boleta ?? null}
                       nota={b.nota}
+                      abonos={b.abonos}
                     />
                   </ResponsiveBoletaWrapper>
                 </div>
@@ -686,6 +688,42 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
   const mostrarFormularioAbono = accion === 'abonar'
   const mostrarFormularioCancelar = accion === 'cancelar'
 
+  const totalMontoAbonoPendiente =
+    Object.keys(boletasSeleccionadas).length > 0
+      ? Object.values(boletasSeleccionadas).reduce((s, m) => s + (m || 0), 0)
+      : Number(monto)
+
+  const abonoSubmitDisabled =
+    procesando ||
+    !metodoPago ||
+    (Object.keys(boletasSeleccionadas).length === 0 && monto <= 0) ||
+    (Object.keys(boletasSeleccionadas).length > 0 && totalMontoAbonoPendiente <= 0)
+
+  const abonoSubmitLabelCorto = procesando
+    ? 'Registrando…'
+    : !metodoPago
+      ? 'Método de pago'
+      : Object.keys(boletasSeleccionadas).length > 0
+        ? `Registrar ($${totalMontoAbonoPendiente.toLocaleString('es-CO')})`
+        : 'Registrar abono'
+
+  const mostrarFabRegistrarAbono =
+    venta.saldo_pendiente > 0 && !mostrarFormularioCancelar && !mostrarConfirmacionAbono
+
+  const handleFabRegistrarAbono = () => {
+    if (!mostrarFormularioAbono) {
+      setAccion('abonar')
+      setError(null)
+      requestAnimationFrame(() => {
+        document.getElementById('form-registrar-abono')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+      return
+    }
+    if (!abonoSubmitDisabled) {
+      setMostrarConfirmacionAbono(true)
+    }
+  }
+
   // Calcular cantidad de transacciones de abono (agrupando por fecha/hora)
   const cantidadTransaccionesAbono = (() => {
     const activos = venta.abonos.filter((a) => a.estado !== 'ANULADO')
@@ -719,7 +757,7 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
   }
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${mostrarFabRegistrarAbono ? 'pb-28 lg:pb-0' : ''}`}>
       {/* Botón Volver */}
       <div className="flex justify-start">
         <button
@@ -1075,7 +1113,7 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
           <h3 className="text-lg font-semibold text-slate-900 mb-2">¿Qué deseas hacer?</h3>
           <p className="text-sm text-slate-500 mb-4">Selecciona las boletas arriba con checkbox y asigna el monto a abonar a cada una, o usa las opciones:</p>
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
             {/* Botón seleccionar todas */}
             {venta.boletas && venta.boletas.filter(b => (b.saldo_pendiente_boleta ?? 0) > 0).length > 0 && (
               <button
@@ -1095,7 +1133,7 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
                   setAccion('abonar')
                   setError(null)
                 }}
-                className="px-6 py-3 border-2 border-blue-200 text-blue-700 rounded-xl hover:bg-blue-50 font-medium transition-colors"
+                className="w-full sm:w-auto px-4 sm:px-6 py-3 border-2 border-blue-200 text-blue-700 rounded-xl hover:bg-blue-50 font-medium transition-colors min-h-[48px] text-sm sm:text-base"
               >
                 {venta.boletas?.filter(b => (b.saldo_pendiente_boleta ?? 0) > 0).every(b => b.id in boletasSeleccionadas)
                   ? '☑️ Deseleccionar todas'
@@ -1115,7 +1153,7 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
                   setAccion('abonar')
                   setError(null)
                 }}
-                className="px-6 py-3 border-2 border-green-200 text-green-700 rounded-xl hover:bg-green-50 font-medium transition-colors"
+                className="w-full sm:w-auto px-4 sm:px-6 py-3 border-2 border-green-200 text-green-700 rounded-xl hover:bg-green-50 font-medium transition-colors min-h-[48px] text-sm sm:text-base"
               >
                 ✅ Pagar total de todas
               </button>
@@ -1123,7 +1161,7 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
             <button
               type="button"
               onClick={() => setAccion('cancelar')}
-              className="px-6 py-3 border-2 border-red-200 text-red-700 rounded-xl hover:bg-red-50 font-medium transition-colors"
+              className="w-full sm:w-auto px-4 sm:px-6 py-3 border-2 border-red-200 text-red-700 rounded-xl hover:bg-red-50 font-medium transition-colors min-h-[48px] text-sm sm:text-base"
             >
               Cancelar venta
             </button>
@@ -1133,7 +1171,7 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
 
       {/* Formulario: Registrar abono */}
       {mostrarFormularioAbono && (
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <div id="form-registrar-abono" className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 sm:p-6 scroll-mt-4">
           {Object.keys(boletasSeleccionadas).length > 0 ? (
             <div className="mb-4">
               <h3 className="text-lg font-semibold text-slate-900">
@@ -1255,26 +1293,26 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
                 className="w-full px-4 py-2 border border-slate-400 rounded-lg resize-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 bg-white text-black placeholder:text-slate-500"
               />
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
                 onClick={() => { setAccion(null); setError(null); setMonto(0); setNotas(''); setBoletasSeleccionadas({}); setPagarTodo(false) }}
-                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
+                className="w-full sm:w-auto px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 min-h-[44px]"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={() => setMostrarConfirmacionAbono(true)}
-                disabled={procesando || !metodoPago || (Object.keys(boletasSeleccionadas).length === 0 && monto <= 0) || (Object.keys(boletasSeleccionadas).length > 0 && Object.values(boletasSeleccionadas).reduce((s, m) => s + (m || 0), 0) <= 0)}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+                disabled={abonoSubmitDisabled}
+                className="hidden sm:flex flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium min-h-[44px] items-center justify-center"
               >
                 {procesando
                   ? 'Registrando...'
                   : !metodoPago
                     ? 'Selecciona método de pago'
                     : Object.keys(boletasSeleccionadas).length > 0
-                      ? `Registrar abono a ${Object.keys(boletasSeleccionadas).length} boleta${Object.keys(boletasSeleccionadas).length > 1 ? 's' : ''} ($${Object.values(boletasSeleccionadas).reduce((s, m) => s + (m || 0), 0).toLocaleString('es-CO')})`
+                      ? `Registrar abono a ${Object.keys(boletasSeleccionadas).length} boleta${Object.keys(boletasSeleccionadas).length > 1 ? 's' : ''} ($${totalMontoAbonoPendiente.toLocaleString('es-CO')})`
                       : 'Registrar abono'}
               </button>
             </div>
@@ -1423,6 +1461,22 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
           )}
         </div>
       )}
+
+      <VentasMobileActionBar
+        visible={mostrarFabRegistrarAbono}
+        ariaLabel="Registrar abono"
+        layout="stack"
+        compact
+        actions={[
+          {
+            id: 'registrar-abono',
+            label: abonoSubmitLabelCorto,
+            onClick: handleFabRegistrarAbono,
+            disabled: mostrarFormularioAbono ? abonoSubmitDisabled : false,
+            variant: 'primary',
+          },
+        ]}
+      />
     </div>
   )
 }

@@ -22,6 +22,7 @@ export default function ClientesPage() {
   const [rifaActual, setRifaActual] = useState<{ id: string; nombre: string; estado: string } | null>(null)
   const [showVendedores, setShowVendedores] = useState(false)
   const [showCreadoPor, setShowCreadoPor] = useState(false)
+  const [mostrarRecordatorioCliente, setMostrarRecordatorioCliente] = useState(false)
   const [resumenFiltros, setResumenFiltros] = useState<ClienteResumenFiltros>({
     todos: 0,
     con_boletas: 0,
@@ -48,6 +49,7 @@ export default function ClientesPage() {
       const rol = String(u.rol || '').toUpperCase()
       setShowVendedores(rol === 'SUPER_ADMIN' || rol === 'ADMIN')
       setShowCreadoPor(rol === 'SUPER_ADMIN' || rol === 'ADMIN')
+      setMostrarRecordatorioCliente(rol === 'VENDEDOR')
     } catch {
       setShowVendedores(false)
       setShowCreadoPor(false)
@@ -143,6 +145,20 @@ export default function ClientesPage() {
     fetchClientes(1, currentSearch, estado)
   }
 
+  const handleRecordatorioRegistrado = (clienteId: string, ultima: string) => {
+    setClientes((prev) =>
+      prev.map((c) =>
+        c.id === clienteId
+          ? {
+              ...c,
+              ultima_notificacion: ultima,
+              total_notificaciones: (c.total_notificaciones || 0) + 1,
+            }
+          : c
+      )
+    )
+  }
+
   if (loading && clientes.length === 0 && viewMode === 'list') {
     return (
       <div className="px-4 py-16 flex items-center justify-center">
@@ -223,6 +239,8 @@ export default function ClientesPage() {
             loading={loading}
             showVendedores={showVendedores}
             showCreadoPor={showCreadoPor}
+            mostrarRecordatorioCliente={mostrarRecordatorioCliente}
+            onRecordatorioRegistrado={handleRecordatorioRegistrado}
           />
         )}
       </main>

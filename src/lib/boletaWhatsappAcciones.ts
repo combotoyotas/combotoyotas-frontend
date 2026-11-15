@@ -39,9 +39,48 @@ export function boletaEstaDisponibleParaVender(boleta: { estado?: string }): boo
   return String(boleta.estado || '').toUpperCase() === 'DISPONIBLE'
 }
 
+/** Boletas reservadas o abonadas con cliente → se pueden abonar en Gestionar ventas */
+export function boletaPuedeAbonarse(boleta: {
+  estado?: string
+  cliente_info?: unknown
+}): boolean {
+  if (!boleta.cliente_info) return false
+  const raw = String(boleta.estado || '').toUpperCase()
+  return raw === 'RESERVADA' || raw === 'ABONADA'
+}
+
+export function urlAbonarBoleta(
+  boleta: { id?: string; numero: number; numeros?: number[]; venta_id?: string | null; cliente_info?: { id?: string } | null },
+  rifaId?: string | null
+): string {
+  const params = new URLSearchParams({ auto: '1' })
+  const numero =
+    Array.isArray(boleta.numeros) && boleta.numeros.length > 0
+      ? boleta.numeros[0]
+      : boleta.numero
+  params.set('numero', String(numero))
+  if (rifaId) params.set('rifa_id', rifaId)
+  if (boleta.venta_id) params.set('venta_id', String(boleta.venta_id))
+  const clienteId = boleta.cliente_info?.id
+  if (clienteId) params.set('cliente_id', clienteId)
+  return `/ventas/gestionar?${params.toString()}`
+}
+
+/** Mínimo para plantillas de recordatorio (ticket o entrega tras venta). */
+export type BoletaWhatsappRecordatorioInput = {
+  id?: string
+  numero: number
+  numeros?: number[]
+  estado?: string
+  cliente_info?: {
+    nombre?: string
+    telefono?: string
+  } | null
+}
+
 export async function abrirWhatsappRecordatorioBoleta(
-  boleta: Boleta | BoletaDetail,
-  rifaInfo?: Rifa | null
+  boleta: Boleta | BoletaDetail | BoletaWhatsappRecordatorioInput,
+  rifaInfo?: Pick<Rifa, 'nombre'> | Rifa | null
 ): Promise<{ ok: boolean; error?: string }> {
   const tel = boleta.cliente_info?.telefono
   if (!tel) {
@@ -80,6 +119,7 @@ export function urlVenderBoleta(rifaId: string, boletaId: string): string {
     rifa_id: rifaId,
     boleta_id: boletaId,
     auto: '1',
+    source: 'boleta-menu',
   })
   return `/ventas/nueva-venta?${params.toString()}`
 }

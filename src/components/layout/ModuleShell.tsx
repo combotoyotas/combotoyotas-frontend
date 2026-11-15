@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { Menu } from 'lucide-react'
 import AppSidebar from '@/components/layout/AppSidebar'
 import MobileTabBar from '@/components/layout/MobileTabBar'
+import ModuleKeepAlive from '@/components/layout/ModuleKeepAlive'
 import {
   getActiveModule,
   normalizeRole,
@@ -91,7 +92,7 @@ export default function ModuleShell({ children }: { children: React.ReactNode })
             cuadriculaFullscreen ? 'max-lg:!p-0 max-lg:!pb-0 overflow-hidden flex flex-col' : ''
           }`}
         >
-          {children}
+          <ModuleKeepAlive>{children}</ModuleKeepAlive>
         </div>
       </div>
 

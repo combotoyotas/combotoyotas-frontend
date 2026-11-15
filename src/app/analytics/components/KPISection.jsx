@@ -136,9 +136,6 @@ export default function KPISection({ data, fechaInicio, fechaFin, scope = 'globa
 
   const vendedoresEntregado = finanzas.vendedores_entregado ?? finanzas.recaudo_vendedores ?? 0;
   const vendedoresPorCobrar = finanzas.vendedores_por_cobrar ?? 0;
-  const vendedoresCobradoClientes = finanzas.vendedores_cobrado_clientes ?? 0;
-  const vendedoresDebeOrg = finanzas.vendedores_debe_organizacion ?? 0;
-  const vendedoresLiq = finanzas.recaudo_vendedores_liquidaciones ?? 0;
 
   const dineroPagedas = pagadas * precioBoleta;
   const dineroReservadas = reservadas * precioBoleta;
@@ -177,22 +174,10 @@ export default function KPISection({ data, fechaInicio, fechaFin, scope = 'globa
   ) : null;
 
   const cuentaVendedoresInline = dc?.ingreso_vendedores ? (
-    <div className="text-[10px] sm:text-xs text-slate-600 mt-2 space-y-1 border-t border-cyan-100 pt-2">
+    <div className="text-[10px] sm:text-xs text-slate-600 mt-2 border-t border-cyan-100 pt-2">
       <div className="flex justify-between gap-2">
-        <span className="text-rose-600 font-medium">Por cobrar (vendedores)</span>
+        <span className="text-rose-600 font-medium">Falta por entregar</span>
         <strong className="text-rose-700">{fmt(vendedoresPorCobrar)}</strong>
-      </div>
-      <div className="flex justify-between gap-2 text-slate-500">
-        <span>Cobrado a clientes (canal vendedor)</span>
-        <span>{fmt(vendedoresCobradoClientes)}</span>
-      </div>
-      <div className="flex justify-between gap-2 text-slate-500">
-        <span>Debe pendiente (vendedores)</span>
-        <span>{fmt(vendedoresDebeOrg)}</span>
-      </div>
-      <div className="flex justify-between gap-2 text-slate-500">
-        <span>Liquidaciones registradas</span>
-        <span>{fmt(vendedoresLiq)}</span>
       </div>
     </div>
   ) : null;
@@ -270,15 +255,8 @@ export default function KPISection({ data, fechaInicio, fechaFin, scope = 'globa
             <KPICard
               title="Recaudo vendedores"
               value={fmt(vendedoresEntregado)}
-              belowValue={
-                <>
-                  <p className="text-[10px] sm:text-xs text-cyan-700/80 mt-0.5">
-                    Solo liquidaciones registradas · el cobrado en calle no entra hasta la entrega
-                  </p>
-                  {cuentaVendedoresInline}
-                </>
-              }
-              subtitle="Por cobrar = parte org. pendiente de entrega"
+              belowValue={cuentaVendedoresInline}
+              subtitle="Arriba: ya entregado · abajo: lo que aún deben traer"
               icon="🤝"
               color="cyan"
               expanded={expandedCard === 'vendedores'}
@@ -306,38 +284,42 @@ export default function KPISection({ data, fechaInicio, fechaFin, scope = 'globa
             onToggle={() => toggle('recaudo')}
           />
         )}
-        {scope === 'global' && !showCanalDesglose && (finanzas.recaudo_vendedores || 0) > 0 && (
+        {scope === 'global' && !showCanalDesglose && (finanzas.vendedores_entregado || finanzas.recaudo_vendedores_liquidaciones || 0) > 0 && (
           <KPICard
             title="Ingreso vendedores"
-            value={fmt(finanzas.recaudo_vendedores)}
-            subtitle="Abonos registrados por vendedores + liquidaciones"
+            value={fmt(finanzas.vendedores_entregado ?? finanzas.recaudo_vendedores_liquidaciones ?? 0)}
+            subtitle="Solo liquidaciones (entregas registradas)"
             icon="🤝"
             color="cyan"
             expanded={expandedCard === 'vendedores'}
             onToggle={() => toggle('vendedores')}
           />
         )}
-        <KPICard
-          title="Proyección Total"
-          value={fmt(finanzas.proyeccion_total)}
-          subtitle={`${totalBoletas.toLocaleString()} boletas × ${fmt(precioBoleta)}`}
-          icon="📊"
-          color="blue"
-          expanded={expandedCard === 'proyeccion'}
-          onToggle={() => toggle('proyeccion')}
-        />
-        <KPICard
-          title="Cumplimiento"
-          value={`${hayFiltro ? finanzas.porcentaje_periodo : finanzas.porcentaje_cumplimiento}%`}
-          subtitle={hayFiltro
-            ? `Global: ${finanzas.porcentaje_cumplimiento}% | Faltan ${fmt(finanzas.proyeccion_total - recaudoTotal)}`
-            : `Faltan ${fmt(finanzas.proyeccion_total - recaudoReal)} para la meta`
-          }
-          icon="🎯"
-          color="cyan"
-          expanded={expandedCard === 'cumplimiento'}
-          onToggle={() => toggle('cumplimiento')}
-        />
+        {scope === 'global' && (
+          <>
+            <KPICard
+              title="Proyección Total"
+              value={fmt(finanzas.proyeccion_total)}
+              subtitle={`${totalBoletas.toLocaleString()} boletas × ${fmt(precioBoleta)}`}
+              icon="📊"
+              color="blue"
+              expanded={expandedCard === 'proyeccion'}
+              onToggle={() => toggle('proyeccion')}
+            />
+            <KPICard
+              title="Cumplimiento"
+              value={`${hayFiltro ? finanzas.porcentaje_periodo : finanzas.porcentaje_cumplimiento}%`}
+              subtitle={hayFiltro
+                ? `Global: ${finanzas.porcentaje_cumplimiento}% | Faltan ${fmt(finanzas.proyeccion_total - recaudoTotal)}`
+                : `Faltan ${fmt(finanzas.proyeccion_total - recaudoReal)} para la meta`
+              }
+              icon="🎯"
+              color="cyan"
+              expanded={expandedCard === 'cumplimiento'}
+              onToggle={() => toggle('cumplimiento')}
+            />
+          </>
+        )}
         <div
           className={`text-left w-full rounded-2xl shadow-sm border p-4 sm:p-5 flex flex-col gap-2 min-w-0
             ${expandedCard === 'ventas' ? 'bg-amber-50 border-amber-200 ring-2 ring-amber-300' : 'bg-white border-slate-200 hover:shadow-md hover:border-amber-200'}`}

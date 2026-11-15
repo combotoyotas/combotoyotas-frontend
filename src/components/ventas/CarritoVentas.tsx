@@ -11,11 +11,14 @@ import ReciboAbono, { ReciboAbonoData } from './ReciboAbono'
 import { formatearInputPesos, parsearInputPesos } from '@/utils/formatPesos'
 import { generarWhatsAppChatLink } from '@/utils/telefono'
 import { WHATSAPP_VENTAS_ACTIVO } from '@/config/features'
-import { downloadBoletaImage } from '@/utils/downloadBoletaImage'
+import BoletaEntregaAcciones from '@/components/ventas/BoletaEntregaAcciones'
+import { guardarBoletaEnDispositivo, nombreArchivoBoleta } from '@/utils/ventasBoletaEntrega'
 import { formatBoletaNumeros } from '@/utils/formatBoletaNumeros'
 import PrincipalGiftLabel from '@/components/ventas/PrincipalGiftLabel'
 import { ajustesApi, type LineaVentaItem, type MedioPagoItem } from '@/lib/ajustesApi'
 import { TokenManager } from '@/utils/auth'
+import VentasMobileActionBar, { type VentasMobileAction } from '@/components/ventas/VentasMobileActionBar'
+import VentasCenteredOverlay from '@/components/ventas/VentasCenteredOverlay'
 
 const MEDIOS_PAGO_MAP: Record<string, string> = {
   'd397d917-c0d0-4c61-b2b3-2ebfab7deeb7': 'Efectivo',
@@ -103,6 +106,57 @@ export default function CarritoVentas({
   const saldoPendiente = tipoVenta === 'ABONO' ? total - montoAbono : 0
   const tipoVentaSeleccionado = tipoVenta !== null
 
+  const reservaDeshabilitada =
+    procesando ||
+    boletas.length === 0 ||
+    !cliente.nombre ||
+    !cliente.telefono ||
+    (requiereLinea && (!lineaVentaId || lineasVenta.length === 0))
+
+  const cobrarDeshabilitado =
+    !tipoVentaSeleccionado ||
+    procesando ||
+    boletas.length === 0 ||
+    !cliente.nombre ||
+    !cliente.telefono ||
+    !medioPagoId ||
+    (tipoVenta === 'ABONO' && montoAbono <= 0) ||
+    (requiereLinea && (!lineaVentaId || lineasVenta.length === 0)) ||
+    (esVendedor && mediosPago.length === 0)
+
+  const etiquetaCobrar = procesando
+    ? 'Procesando...'
+    : !tipoVentaSeleccionado
+      ? 'Elige tipo de operación'
+      : !medioPagoId
+        ? 'Elige método de pago'
+        : tipoVenta === 'ABONO'
+          ? `Cobrar abono $${montoAbono.toLocaleString('es-CO')}`
+          : `Cobrar $${total.toLocaleString('es-CO')}`
+
+  const accionesMobileCobro: VentasMobileAction[] =
+    paso !== 'resumen' || boletas.length === 0
+      ? []
+      : tipoVenta === 'RESERVA'
+        ? [
+            {
+              id: 'reserva',
+              label: procesando ? 'Procesando...' : '📌 Crear reserva',
+              onClick: () => setMostrarDialogoReserva(true),
+              disabled: reservaDeshabilitada,
+              variant: 'danger',
+            },
+          ]
+        : [
+            {
+              id: 'cobrar',
+              label: etiquetaCobrar,
+              onClick: () => setMostrarConfirmacion(true),
+              disabled: cobrarDeshabilitado,
+              variant: tipoVenta === 'ABONO' ? 'warning' : 'success',
+            },
+          ]
+
   // Helpers para abono por boleta
   const setAbonoBoleta = (boletaId: string, monto: number) => {
     setAbonosPorBoleta(prev => ({ ...prev, [boletaId]: Math.max(0, Math.min(monto, precioBoleta)) }))
@@ -118,11 +172,11 @@ export default function CarritoVentas({
   // Remover boleta del carrito
   const removerBoleta = async (boleta: BoletaEnCarrito) => {
     try {
-      await ventasApi.desbloquearBoleta(boleta.id, boleta.reserva_token)
+      await ventasApi.desbloquearBoletaDelCarrito(boleta.id, boleta.reserva_token)
       onBoletaRemovida(boleta.id)
     } catch (error) {
-      console.error('Error removiendo boleta:', error)
-      setError('Error al remover boleta del carrito')
+      const msg = error instanceof Error ? error.message : 'Error al remover boleta del carrito'
+      setError(msg)
     }
   }
 
@@ -270,9 +324,9 @@ export default function CarritoVentas({
     // Intentar liberar cada boleta individualmente (silenciar errores)
     for (const b of boletas) {
       try {
-        await ventasApi.desbloquearBoleta(b.id, b.reserva_token)
+        await ventasApi.desbloquearBoletaDelCarrito(b.id, b.reserva_token)
       } catch {
-        // Silenciar: la boleta puede ya haberse expirado o liberado
+        /* token viejo o ya liberada */
       }
     }
   }
@@ -297,28 +351,77 @@ export default function CarritoVentas({
     return `${minutos}:${segundos.toString().padStart(2, '0')}`
   }
 
-  // Hooks de descarga (misma lógica que módulo de Mis Boletas)
-  const descargarBoleta = useCallback(async (boletaNumero: number, identificacion: string, elementId: string) => {
-    try {
-      const cc = (identificacion || 'SIN_CC').replace(/\s+/g, '_')
-      await downloadBoletaImage({
-        elementId,
-        fileName: `boleta_${boletaNumero.toString().padStart(4, '0')}_CC_${cc}.png`,
-      })
-    } catch (err) {
-      console.error('Error descargando boleta:', err)
+  const construirReciboDesdeVenta = useCallback((): ReciboAbonoData | null => {
+    if (!ventaResponse) return null
+    const boletasResp = ventaResponse.boletas ?? []
+    const mpLabel = labelMedio(medioPagoId)
+    const pagadoHoy = tipoVenta === 'ABONO' ? montoAbono : total
+    return {
+      tipo: tipoVenta === 'ABONO' ? 'venta_abono' : 'venta_nueva',
+      montoRegistrado: pagadoHoy,
+      totalVenta: total,
+      totalPagado: pagadoHoy,
+      saldoPendiente: tipoVenta === 'ABONO' ? saldoPendiente : 0,
+      clienteNombre: cliente.nombre,
+      clienteTelefono: cliente.telefono,
+      clienteEmail: cliente.email,
+      clienteIdentificacion: cliente.identificacion,
+      rifaNombre: rifaNombre,
+      metodoPago: mpLabel,
+      notas: notas || undefined,
+      ventaId: ventaResponse.id,
+      boletas: boletasResp.map((b: { id: string; numero: number; numeros?: number[] }) => {
+        const abonoBoleta = tipoVenta === 'ABONO' ? abonosPorBoleta[b.id] || 0 : precioBoleta
+        const saldoB = precioBoleta - abonoBoleta
+        const local = boletas.find((x) => x.id === b.id)
+        return {
+          numero: b.numero,
+          numeros: Array.isArray(b.numeros) ? b.numeros.map(Number) : [Number(b.numero)],
+          numero_principal: (b as { numero_principal?: number }).numero_principal ?? local?.numero_principal ?? b.numero,
+          estado: abonoBoleta >= precioBoleta ? 'PAGADA' : abonoBoleta > 0 ? 'ABONADA' : 'PENDIENTE',
+          precioBoleta: precioBoleta,
+          totalPagado: abonoBoleta,
+          saldoPendiente: saldoB > 0 ? saldoB : 0,
+        }
+      }),
     }
-  }, [])
+  }, [
+    ventaResponse,
+    medioPagoId,
+    tipoVenta,
+    montoAbono,
+    total,
+    saldoPendiente,
+    cliente,
+    rifaNombre,
+    notas,
+    precioBoleta,
+    abonosPorBoleta,
+    boletas,
+    labelMedio,
+  ])
+
+  const accionesMobileCompletado: VentasMobileAction[] = [
+    {
+      id: 'nueva-venta',
+      label: 'Nueva venta',
+      onClick: onVentaCompletada,
+      variant: 'primary',
+    },
+  ]
 
   const descargarTodas = useCallback(async () => {
     const boletasData = ventaResponse?.boletas ?? []
     const identificacion = cliente.identificacion || 'SIN_CC'
     for (const b of boletasData) {
       const elementId = `boleta-print-${b.id}`
-      await descargarBoleta(b.numero, identificacion, elementId)
-      await new Promise(r => setTimeout(r, 500))
+      await guardarBoletaEnDispositivo(
+        elementId,
+        nombreArchivoBoleta(b.numero, identificacion)
+      )
+      await new Promise((r) => setTimeout(r, 500))
     }
-  }, [ventaResponse, cliente.identificacion, descargarBoleta])
+  }, [ventaResponse, cliente.identificacion])
 
   const whatsappLink = generarWhatsAppChatLink(cliente.telefono)
 
@@ -343,7 +446,7 @@ export default function CarritoVentas({
     const boletasVenta = ventaResponse?.boletas ?? []
 
     return (
-      <div className="space-y-6 pb-28 sm:pb-8">
+      <div className="space-y-6 pb-[calc(var(--tabbar-h)+var(--sab)+3.75rem)] lg:pb-8">
         {/* Modal de Recibo/Factura */}
         {reciboData && (
           <ReciboAbono
@@ -352,11 +455,41 @@ export default function CarritoVentas({
           />
         )}
 
+        <VentasMobileActionBar
+          visible={!reciboData}
+          layout="stack"
+          compact
+          ariaLabel="Venta completada"
+          actions={accionesMobileCompletado}
+        />
+
         {/* Sección de Boletas para imprimir/descargar */}
         {boletasVenta.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-slate-900">🎫 Boletas de la Compra</h3>
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <h3 className="text-base sm:text-lg font-medium text-slate-900">🎫 Boletas de la Compra</h3>
+              <div className="flex flex-wrap items-center gap-2 lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const data = construirReciboDesdeVenta()
+                    if (data) setReciboData(data)
+                  }}
+                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 px-2 py-1"
+                >
+                  Ver recibo
+                </button>
+                {WHATSAPP_VENTAS_ACTIVO && whatsappLink && (
+                  <a
+                    href={whatsappLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-semibold text-green-700 hover:text-green-900 px-2 py-1"
+                  >
+                    WhatsApp
+                  </a>
+                )}
+              </div>
               <div className="flex gap-2">
                 <button
                   onClick={descargarTodas}
@@ -371,9 +504,18 @@ export default function CarritoVentas({
             </div>
 
             <div className="space-y-6">
-              {boletasVenta.map((b: any) => (
+              {boletasVenta.map((b: any) => {
+                const estadoRaw =
+                  tipoVenta === 'RESERVA'
+                    ? 'RESERVADA'
+                    : tipoVenta === 'ABONO'
+                      ? (abonosPorBoleta[b.id] || 0) >= precioBoleta
+                        ? 'PAGADA'
+                        : 'ABONADA'
+                      : 'PAGADA'
+                return (
                 <div key={b.id} className="border border-slate-200 rounded-lg p-4 overflow-visible">
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
                     <span className="font-bold text-slate-900">
                       <PrincipalGiftLabel
                         numeros={b.numeros}
@@ -382,27 +524,18 @@ export default function CarritoVentas({
                         compact
                       />
                     </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => descargarBoleta(b.numero, cliente.identificacion || '', `boleta-print-${b.id}`)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-medium"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Descargar
-                      </button>
-                      <Link
-                        href={`/boletas/${b.id}/print`}
-                        target="_blank"
-                        className="inline-flex items-center gap-1 px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-xs font-medium"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                        </svg>
-                        Imprimir
-                      </Link>
-                    </div>
+                    <BoletaEntregaAcciones
+                      elementId={`boleta-print-${b.id}`}
+                      numero={b.numero}
+                      numeros={b.numeros}
+                      identificacion={cliente.identificacion}
+                      telefono={cliente.telefono}
+                      clienteNombre={cliente.nombre}
+                      rifaNombre={rifaNombre}
+                      estadoLabel={estadoRaw}
+                      estadoRaw={estadoRaw}
+                      boletaId={b.id}
+                    />
                   </div>
               {/* Boleta renderizada */}
               <ResponsiveBoletaWrapper id={`boleta-print-${b.id}`}>
@@ -415,91 +548,67 @@ export default function CarritoVentas({
                   imagenUrl={b.imagen_url}
                   rifaNombre={rifaNombre || ''}
                   estado={
-                    tipoVenta === 'ABONO'
-                      ? (abonosPorBoleta[b.id] || 0) >= precioBoleta
-                        ? 'PAGADA'
-                        : 'ABONADA'
-                      : 'CON_PAGO'
+                    tipoVenta === 'RESERVA'
+                      ? 'RESERVADA'
+                      : tipoVenta === 'ABONO'
+                        ? (abonosPorBoleta[b.id] || 0) >= precioBoleta
+                          ? 'PAGADA'
+                          : 'ABONADA'
+                        : 'CON_PAGO'
                   }
                   clienteInfo={{
                     nombre: cliente.nombre,
                     identificacion: cliente.identificacion
                   }}
                   deuda={
-                    tipoVenta === 'ABONO'
-                      ? Math.max(precioBoleta - (abonosPorBoleta[b.id] || 0), 0)
-                      : 0
+                    tipoVenta === 'RESERVA'
+                      ? precioBoleta
+                      : tipoVenta === 'ABONO'
+                        ? Math.max(precioBoleta - (abonosPorBoleta[b.id] || 0), 0)
+                        : 0
+                  }
+                  reservadaHasta={
+                    tipoVenta === 'RESERVA' ? ventaResponse?.bloqueo_hasta : undefined
                   }
                   precio={precioBoleta}
                 />
               </ResponsiveBoletaWrapper>
                 </div>
-              ))}
+              )})}
             </div>
           </div>
         )}
 
-        {/* Botones de acción */}
-        <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm border-t border-slate-200 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:bg-transparent sm:border-0 sm:backdrop-blur-none sm:px-0 sm:py-0 sm:pb-0">
+        {/* Botones de acción — escritorio */}
+        <div className="hidden lg:block">
           <div className="max-w-7xl mx-auto flex flex-wrap justify-center gap-3">
-          {WHATSAPP_VENTAS_ACTIVO && whatsappLink && (
-            <a
-              href={whatsappLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium inline-flex items-center gap-2"
+            {WHATSAPP_VENTAS_ACTIVO && whatsappLink && (
+              <a
+                href={whatsappLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium inline-flex items-center gap-2"
+              >
+                WhatsApp del cliente
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                const data = construirReciboDesdeVenta()
+                if (data) setReciboData(data)
+              }}
+              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium inline-flex items-center gap-2"
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-              </svg>
-              Abrir WhatsApp del cliente
-            </a>
-          )}
-          <button
-            onClick={() => {
-              const boletasResp = ventaResponse?.boletas ?? []
-              const mpLabel = labelMedio(medioPagoId)
-              const pagadoHoy = tipoVenta === 'ABONO' ? montoAbono : total
-              setReciboData({
-                tipo: tipoVenta === 'ABONO' ? 'venta_abono' : 'venta_nueva',
-                montoRegistrado: pagadoHoy,
-                totalVenta: total,
-                totalPagado: pagadoHoy,
-                saldoPendiente: tipoVenta === 'ABONO' ? saldoPendiente : 0,
-                clienteNombre: cliente.nombre,
-                clienteTelefono: cliente.telefono,
-                clienteEmail: cliente.email,
-                clienteIdentificacion: cliente.identificacion,
-                rifaNombre: rifaNombre,
-                metodoPago: mpLabel,
-                notas: notas || undefined,
-                ventaId: ventaResponse?.id,
-                boletas: boletasResp.map((b: any) => {
-                  const abonoBoleta = tipoVenta === 'ABONO' ? (abonosPorBoleta[b.id] || 0) : precioBoleta
-                  const saldoB = precioBoleta - abonoBoleta
-                  return {
-                    numero: b.numero,
-                    estado: abonoBoleta >= precioBoleta ? 'PAGADA' : abonoBoleta > 0 ? 'ABONADA' : 'PENDIENTE',
-                    precioBoleta: precioBoleta,
-                    totalPagado: abonoBoleta,
-                    saldoPendiente: saldoB > 0 ? saldoB : 0
-                  }
-                })
-              })
-            }}
-            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium inline-flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Ver Recibo
-          </button>
-          <button
-            onClick={onVentaCompletada}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-          >
-            Nueva Venta
-          </button>
+              Ver recibo
+            </button>
+            <button
+              type="button"
+              onClick={onVentaCompletada}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+            >
+              Nueva venta
+            </button>
           </div>
         </div>
       </div>
@@ -507,7 +616,13 @@ export default function CarritoVentas({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 sm:p-6 pb-28 sm:pb-6">
+    <div
+      className={`bg-white rounded-lg shadow-sm border border-slate-200 p-4 sm:p-6 lg:pb-6 ${
+        paso === 'resumen' && boletas.length > 0
+          ? 'pb-[calc(var(--tabbar-h)+var(--sab)+4.75rem)]'
+          : 'pb-28 lg:pb-6'
+      }`}
+    >
       <div className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:items-center mb-4 sm:mb-6">
         <h2 className="text-base sm:text-lg font-bold text-black">Resumen de Venta</h2>
         <div className="text-sm text-slate-600">
@@ -843,75 +958,66 @@ export default function CarritoVentas({
         </div>
       )}
 
-      {/* Botones de acción — sticky en móvil */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 sm:static bg-white/95 sm:bg-transparent backdrop-blur-sm sm:backdrop-blur-none border-t sm:border-0 border-slate-200 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-0 sm:py-0 -mx-4 sm:mx-0">
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 max-w-7xl mx-auto">
-        {boletas.length > 0 && (
-          <button
-            onClick={cancelarVenta}
-            disabled={procesando}
-            className="w-full sm:flex-1 px-4 py-3 sm:py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-50 min-h-[48px]"
-          >
-            Cancelar
-          </button>
-        )}
-        
-        {tipoVenta === 'RESERVA' ? (
-          <button
-            onClick={() => setMostrarDialogoReserva(true)}
-            disabled={
-              procesando ||
-              boletas.length === 0 ||
-              !cliente.nombre ||
-              !cliente.telefono ||
-              (requiereLinea && (!lineaVentaId || lineasVenta.length === 0))
-            }
-            className="w-full sm:flex-1 px-4 py-3 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors min-h-[48px]"
-          >
-            {procesando ? 'Procesando...' : `📌 Crear Reserva`}
-          </button>
-        ) : (
-          <button
-            onClick={() => setMostrarConfirmacion(true)}
-            disabled={
-              !tipoVentaSeleccionado ||
-              procesando ||
-              boletas.length === 0 ||
-              !cliente.nombre ||
-              !cliente.telefono ||
-              !medioPagoId ||
-              (tipoVenta === 'ABONO' && montoAbono <= 0) ||
-              (requiereLinea &&
-                (!lineaVentaId || lineasVenta.length === 0)) ||
-              (esVendedor && mediosPago.length === 0)
-            }
-            className={`w-full sm:flex-1 px-4 py-3 sm:py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors min-h-[48px] ${
-              tipoVenta === 'COMPLETA' 
-                ? 'bg-green-600 hover:bg-green-700' 
-                : tipoVenta === 'ABONO'
-                  ? 'bg-yellow-600 hover:bg-yellow-700'
-                  : 'bg-slate-400'
-            }`}
-          >
-            {procesando 
-              ? 'Procesando...' 
-              : !tipoVentaSeleccionado
-                ? 'Elige tipo de operación'
-                : !medioPagoId
-                  ? 'Elige método de pago'
-                  : tipoVenta === 'ABONO' 
-                    ? `Cobrar abono $${montoAbono.toLocaleString('es-CO')}`
-                    : `Cobrar $${total.toLocaleString('es-CO')}`
-            }
-          </button>
-        )}
+      {/* Botones de acción — escritorio (móvil usa VentasMobileActionBar en portal) */}
+      <div className="hidden lg:block pt-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex flex-row gap-3 max-w-7xl">
+          {boletas.length > 0 && (
+            <button
+              type="button"
+              onClick={cancelarVenta}
+              disabled={procesando}
+              className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-50 min-h-[44px]"
+            >
+              Cancelar
+            </button>
+          )}
+
+          {tipoVenta === 'RESERVA' ? (
+            <button
+              type="button"
+              onClick={() => setMostrarDialogoReserva(true)}
+              disabled={reservaDeshabilitada}
+              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium min-h-[44px]"
+            >
+              {procesando ? 'Procesando...' : '📌 Crear Reserva'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setMostrarConfirmacion(true)}
+              disabled={cobrarDeshabilitado}
+              className={`flex-1 px-4 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium min-h-[44px] ${
+                tipoVenta === 'COMPLETA'
+                  ? 'bg-green-600 hover:bg-green-700'
+                  : tipoVenta === 'ABONO'
+                    ? 'bg-yellow-600 hover:bg-yellow-700'
+                    : 'bg-slate-400'
+              }`}
+            >
+              {etiquetaCobrar}
+            </button>
+          )}
         </div>
       </div>
 
+      <VentasMobileActionBar
+        visible={
+          paso === 'resumen' &&
+          !mostrarDialogoReserva &&
+          !mostrarConfirmacion &&
+          accionesMobileCobro.length > 0
+        }
+        ariaLabel="Cobrar o reservar"
+        actions={accionesMobileCobro}
+      />
+
       {/* Modal de confirmación */}
       {mostrarConfirmacion && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+        <VentasCenteredOverlay
+          open={mostrarConfirmacion}
+          onBackdropClick={() => setMostrarConfirmacion(false)}
+        >
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 max-h-[min(90dvh,32rem)] overflow-y-auto">
             <div className={`text-center mb-4 p-3 rounded-lg ${tipoVenta === 'COMPLETA' ? 'bg-green-50' : 'bg-yellow-50'}`}>
               <h3 className={`text-lg font-bold ${tipoVenta === 'COMPLETA' ? 'text-green-800' : 'text-yellow-800'}`}>
                 {tipoVenta === 'COMPLETA' ? '✅ Confirmar Pago Total' : '💰 Confirmar Abono'}
@@ -977,7 +1083,7 @@ export default function CarritoVentas({
               </button>
             </div>
           </div>
-        </div>
+        </VentasCenteredOverlay>
       )}
 
       {/* Diálogo de reserva */}
@@ -992,9 +1098,27 @@ export default function CarritoVentas({
         onClose={() => setMostrarDialogoReserva(false)}
         lineaVentaId={lineaVentaId || undefined}
         requiereLinea={requiereLinea}
-        onReservaCompletada={() => {
+        onReservaCompletada={(data) => {
           setMostrarDialogoReserva(false)
-          onVentaCompletada()
+          const boletasApi = data.boletas_reservadas ?? []
+          const boletasMerged = boletasApi.map((b) => {
+            const local = boletas.find((x) => x.id === b.id)
+            return {
+              ...b,
+              barcode: local?.barcode,
+              qr_url: b.qr_url ?? local?.qr_url,
+              imagen_url: b.imagen_url ?? local?.imagen_url,
+            }
+          })
+          setVentaResponse({
+            ...data,
+            boletas: boletasMerged,
+          })
+          setTipoVenta('RESERVA')
+          setPaso('completado')
+          if (typeof window !== 'undefined') {
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          }
         }}
       />
     </div>

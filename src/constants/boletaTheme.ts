@@ -37,8 +37,4 @@ export const BOLETA_NUMERO_STYLE =
 export const BOLETA_PRECIO_STYLE =
   'font-size:12px;font-weight:700;margin-top:4px;color:#111;text-align:center;'
 
-export const BOLETA_BONO_HTML = (cancelado: boolean) => `
-  <div style="position:absolute;right:6px;bottom:6px;z-index:5;background:rgba(255,255,255,0.94);border:1px solid #111;border-radius:2px;padding:4px 6px 5px;min-width:88px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);">
-    <div style="font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:0.02em;color:#111;">Bono de cancelación</div>
-    <div style="font-size:10px;font-weight:800;margin-top:2px;color:${cancelado ? '#15803d' : '#737373'};">${cancelado ? 'Cancelado' : 'Pendiente'}</div>
-  </div>`
+export { BOLETA_BONO_FOOTER_HTML as BOLETA_BONO_HTML } from '@/constants/boletaBonoOverlay'

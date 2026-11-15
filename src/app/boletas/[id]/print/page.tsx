@@ -164,6 +164,7 @@ export default function BoletaPrintPage() {
             reservadaHasta={boleta.bloqueo_hasta}
             precio={boleta.boleta_financiero?.precio_boleta}
             nota={boleta.nota}
+            abonos={boleta.abonos}
           />
         </ResponsiveBoletaWrapper>
       </div>

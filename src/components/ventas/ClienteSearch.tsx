@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { Cliente, ClienteSimilar } from '@/types/ventas'
 import { ventasApi } from '@/lib/ventasApi'
+import VentasMobileActionBar from '@/components/ventas/VentasMobileActionBar'
 
 interface ClienteSearchProps {
   onClienteSelected: (cliente: Cliente) => void
@@ -382,8 +383,17 @@ export default function ClienteSearch({
   const inputClass =
     'block w-full pl-10 pr-3 py-3 sm:py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-transparent bg-white text-black placeholder:text-slate-400 text-base sm:text-sm min-h-[48px]'
 
+  const mostrarFabCliente =
+    permitirCrear && modo === 'NUEVO' && !clienteCreadoExitosamente
+
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 pb-28 sm:pb-6">
+    <div
+      className={`bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:pb-6 ${
+        mostrarFabCliente
+          ? 'pb-[calc(var(--tabbar-h)+var(--sab)+4.75rem)]'
+          : 'pb-28 lg:pb-6'
+      }`}
+    >
       <div className="mb-4 sm:mb-6">
         <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
           <User className="w-5 h-5 text-blue-600 shrink-0" />
@@ -697,12 +707,12 @@ export default function ClienteSearch({
             </div>
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 z-30 sm:static bg-white/95 sm:bg-transparent backdrop-blur-sm sm:backdrop-blur-none border-t sm:border-0 border-slate-200 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-0 sm:py-0 -mx-4 sm:mx-0">
+          <div className="hidden lg:block pt-2 -mx-4 sm:mx-0 px-4 sm:px-0">
             <button
               type="button"
               onClick={crearCliente}
               disabled={creando || !clienteNuevo.nombre.trim() || !clienteNuevo.telefono.trim()}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3.5 sm:py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold min-h-[52px] shadow-lg shadow-blue-600/20 sm:shadow-none"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold min-h-[52px]"
             >
               {creando ? (
                 <>
@@ -720,7 +730,30 @@ export default function ClienteSearch({
         </div>
       )}
 
-      
+      <VentasMobileActionBar
+        visible={mostrarFabCliente}
+        ariaLabel="Continuar con cliente"
+        actions={[
+          {
+            id: 'continuar-cliente',
+            label: creando ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Guardando...
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-2 px-1">
+                <UserPlus className="w-5 h-5 shrink-0" />
+                Continuar con este cliente
+              </span>
+            ),
+            onClick: crearCliente,
+            disabled:
+              creando || !clienteNuevo.nombre.trim() || !clienteNuevo.telefono.trim(),
+            variant: 'primary',
+          },
+        ]}
+      />
     </div>
   )
 }

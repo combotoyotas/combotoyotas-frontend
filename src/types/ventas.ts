@@ -198,6 +198,10 @@ export interface ReservaRequest {
 export interface BolataReservada {
   id: string
   numero: number
+  numeros?: number[]
+  numero_principal?: number | null
+  qr_url?: string | null
+  imagen_url?: string | null
 }
 
 export interface ReservaResponse {

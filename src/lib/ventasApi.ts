@@ -76,6 +76,7 @@ class VentasApiService {
         'BOLETA_ALREADY_SOLD',
         'BOLETA_FUERA_DE_INVENTARIO',
         'SISTEMA_EN_PAUSA',
+        'INVALID_RESERVATION_TOKEN',
       ])
       const isExpected =
         expectedCodes.has(data?.error) ||
@@ -174,6 +175,32 @@ class VentasApiService {
         })
       }
     )
+  }
+
+  /**
+   * Quita el bloqueo si aplica; si el token ya no coincide (borrador viejo),
+   * trata como liberada para no romper la UI.
+   */
+  async desbloquearBoletaDelCarrito(
+    boletaId: string,
+    reservaToken: string
+  ): Promise<'released' | 'already_free'> {
+    const token = reservaToken?.trim()
+    if (!token) return 'already_free'
+    try {
+      await this.desbloquearBoleta(boletaId, token)
+      return 'released'
+    } catch (e: unknown) {
+      const err = e as { code?: string; response?: { data?: { error?: string } }; message?: string }
+      const code = err.code ?? err.response?.data?.error
+      if (
+        code === 'INVALID_RESERVATION_TOKEN' ||
+        /token de reserva inválido|invalid reservation token/i.test(String(err.message || ''))
+      ) {
+        return 'already_free'
+      }
+      throw e
+    }
   }
 
   async actualizarEstadoBoleta(

@@ -6,6 +6,13 @@ import type { Boleta } from '@/types/boleta'
 import type { Rifa } from '@/types/rifa'
 import { getStorageImageUrl } from '@/lib/storageImageUrl'
 import { boletaApi } from '@/lib/boletaApi'
+import { ventasApi } from '@/lib/ventasApi'
+import type { BoletaBusquedaExterna } from '@/lib/boletaConsultaBusqueda'
+import BoletaConsultaExternaPanel from '@/components/boletas/BoletaConsultaExternaPanel'
+import {
+  clearVentasNuevaDraft,
+  saveVentasPrefillBoletaIds,
+} from '@/lib/ventasNuevaDraft'
 import { downloadBoletaFromElement } from '@/utils/downloadBoletaImage'
 import {
   BOLETA_BADGE_STYLES,
@@ -24,87 +31,51 @@ import {
   BOLETA_DEFAULT_HEIGHT,
   boletaHeightForImage,
 } from '@/constants/boletaDimensions'
-import { formatBoletaNumeros, searchMatchesNumeros, normalizeNumeros, getPrincipalGift, sanitizeBoletaSearchDigits } from '@/utils/formatBoletaNumeros'
+import { formatBoletaNumeros, normalizeNumeros, getPrincipalGift, sanitizeBoletaSearchDigits } from '@/utils/formatBoletaNumeros'
+import { boletaEstaBloqueadaSinCliente, getBoletaEstadoMenuInfo } from '@/utils/boletaEstadoMenu'
+import { ventasPublicasApi } from '@/lib/ventasPublicasApi'
 import BoletaOpcionesMenu from '@/components/boletas/BoletaOpcionesMenu'
 import BoletaFiltroStatCard from '@/components/boletas/BoletaFiltroStatCard'
-
-/** Quita acentos para comparar nombres (José ≈ Jose). */
-function normalizeText(value: string): string {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim()
-}
-
-/**
- * Búsqueda de boletas:
- * - Solo letras → nombre / teléfono (no números de boleta)
- * - Solo cifras y ≤4 → número de boleta
- * - Solo cifras y >4 → cédula / teléfono (no tratar como boleta)
- * - Mezcla → nombre + cédula + número de boleta
- */
-function boletaMatchesSearch(boleta: Boleta, rawTerm: string): boolean {
-  const term = String(rawTerm || '').trim()
-  if (!term) return true
-
-  const digits = term.replace(/\D/g, '')
-  const hasLetters = /[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/.test(term)
-  const onlyDigits = digits.length > 0 && !hasLetters
-
-  const nombre = normalizeText(boleta.cliente_info?.nombre || '')
-  const telefono = String(boleta.cliente_info?.telefono || '').replace(/\D/g, '')
-  const identificacion = String(boleta.cliente_info?.identificacion || '').replace(/\D/g, '')
-  const termNorm = normalizeText(term)
-
-  const matchNombre =
-    Boolean(termNorm) &&
-    termNorm.split(/\s+/).filter(Boolean).every((part) => nombre.includes(part))
-
-  const matchCedula =
-    digits.length > 0 &&
-    (identificacion.includes(digits) || (digits.length >= 4 && identificacion.endsWith(digits)))
-
-  const matchTelefono =
-    digits.length >= 4 && telefono.includes(digits)
-
-  // Cédula / documento largo: no buscar como número de boleta
-  if (onlyDigits && digits.length > 4) {
-    return matchCedula || matchTelefono
-  }
-
-  // Nombre (sin dígitos útiles): no marcar todas las boletas por matchNumero vacío
-  if (hasLetters && digits.length === 0) {
-    return matchNombre
-  }
-
-  const matchNumero = searchMatchesNumeros(
-    boleta.numeros,
-    sanitizeBoletaSearchDigits(term),
-    boleta.numero
-  )
-
-  if (onlyDigits) {
-    return matchNumero || matchCedula || matchTelefono
-  }
-
-  // Texto con letras y números
-  return matchNombre || matchCedula || matchTelefono || matchNumero
-}
+import {
+  BOLETA_SEARCH_TABS,
+  type BoletaSearchMode,
+  boletaMatchesSearchMode,
+  scoreBoletaNombreMatch,
+} from '@/utils/boletaSearch'
 
 interface BoletaListProps {
   boletas: Boleta[]
   loading: boolean
   rifaInfo?: Rifa | null
+  onRefreshBoletas?: () => void | Promise<void>
+  /** Vendedor sin red: solo consulta, sin detalle ni acciones. */
+  offlineMode?: boolean
 }
 
-export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListProps) {
+/** DISPONIBLE en BD pero con venta_id = dato inconsistente; no se puede volver a vender. */
+function boletaDisponibleParaVenta(boleta: Boleta): boolean {
+  const estadoRaw = boleta.estado?.toString().trim().toUpperCase() || ''
+  if (estadoRaw !== 'DISPONIBLE') return false
+  if (boleta.venta_id) return false
+  if (boleta.bloqueo_hasta && new Date(boleta.bloqueo_hasta) > new Date()) return false
+  return true
+}
+
+export default function BoletaList({
+  boletas,
+  loading,
+  rifaInfo,
+  onRefreshBoletas,
+  offlineMode = false,
+}: BoletaListProps) {
   const [searchTerm, setSearchTerm] = useState('')
+  const [searchMode, setSearchMode] = useState<BoletaSearchMode>('boleta')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(20)
   const [filtroEstado, setFiltroEstado] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [downloading, setDownloading] = useState(false)
+  const [iniciandoVenta, setIniciandoVenta] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 })
   const [editingNotaId, setEditingNotaId] = useState<string | null>(null)
   const [notaTemp, setNotaTemp] = useState('')
@@ -114,9 +85,24 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
   const [menuBoleta, setMenuBoleta] = useState<Boleta | null>(null)
   const [menuAnchorEl, setMenuAnchorEl] = useState<HTMLElement | null>(null)
   const [isDesktop, setIsDesktop] = useState(false)
-  const [filtrosMobileOpen, setFiltrosMobileOpen] = useState(false)
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [consultaExterna, setConsultaExterna] = useState<BoletaBusquedaExterna | null>(null)
+  const [consultaExternaLoading, setConsultaExternaLoading] = useState(false)
+  const [consultaExternaNotFound, setConsultaExternaNotFound] = useState(false)
+  const [desbloqueandoId, setDesbloqueandoId] = useState<string | null>(null)
   const router = useRouter()
   const esDoble = Boolean(rifaInfo?.doble_oportunidad)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('user')
+      if (!raw) return
+      const user = JSON.parse(raw) as { rol?: string }
+      setUserRole(String(user.rol || '').toUpperCase())
+    } catch {
+      setUserRole(null)
+    }
+  }, [])
 
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)')
@@ -136,7 +122,59 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
     setMenuAnchorEl(null)
   }
 
+  const handleDesbloquearBoleta = useCallback(
+    async (boleta: Boleta) => {
+      if (desbloqueandoId) return
+      setDesbloqueandoId(boleta.id)
+      try {
+        let token = boleta.reserva_token?.trim() || ''
+        if (!token) {
+          const detail = await boletaApi.getBoletaById(boleta.id)
+          token = detail.data?.reserva_token?.trim() || ''
+        }
+        if (token) {
+          await ventasApi.desbloquearBoletaDelCarrito(boleta.id, token)
+        } else if (userRole === 'SUPER_ADMIN' || userRole === 'ADMIN') {
+          await ventasPublicasApi.liberarBoleta(boleta.id)
+        } else {
+          window.alert(
+            'No se pudo desbloquear: no tienes el token de reserva. Libera la boleta desde ventas o contacta al administrador.'
+          )
+          return
+        }
+        await onRefreshBoletas?.()
+      } catch (e) {
+        window.alert(e instanceof Error ? e.message : 'No se pudo desbloquear la boleta')
+      } finally {
+        setDesbloqueandoId(null)
+      }
+    },
+    [desbloqueandoId, onRefreshBoletas, userRole]
+  )
+
+  const renderBotonDesbloquear = (boleta: Boleta, compact = false) => {
+    if (offlineMode) return null
+    if (!boletaEstaBloqueadaSinCliente(boleta)) return null
+    const busy = desbloqueandoId === boleta.id
+    return (
+      <button
+        type="button"
+        disabled={Boolean(desbloqueandoId)}
+        onClick={() => handleDesbloquearBoleta(boleta)}
+        className={
+          compact
+            ? 'shrink-0 min-h-[32px] px-2 py-1 text-[10px] font-bold rounded-lg border border-amber-500 text-amber-900 bg-amber-50 hover:bg-amber-100 disabled:opacity-50'
+            : 'inline-flex items-center min-h-[28px] px-2.5 py-1 text-[11px] font-bold rounded-lg border border-amber-500 text-amber-900 bg-amber-50 hover:bg-amber-100 disabled:opacity-50'
+        }
+        title="Quitar bloqueo temporal y dejar disponible"
+      >
+        {busy ? '…' : 'Desbloquear'}
+      </button>
+    )
+  }
+
   const renderAccionesBoleta = (boleta: Boleta, compact = false) => {
+    if (offlineMode) return null
     const btnClass = compact
       ? 'p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200'
       : 'text-slate-600 hover:text-blue-600 transition-colors p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-slate-100'
@@ -174,28 +212,14 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
   }
 
   // Determina label y clases del estado según la boleta
-  const getEstadoInfo = (boleta: Boleta) => {
-    const estadoRaw = boleta.estado?.toString().trim().toUpperCase() || ''
-
-    if (estadoRaw === 'RESERVADA') {
-      if (boleta.cliente_info) return { label: 'RESERVADA', classes: 'bg-blue-600 text-white' }
-      return { label: 'BLOQUEADA', classes: 'bg-amber-200 text-black' }
-    }
-    if (estadoRaw === 'ABONADA') return { label: 'ABONADA', classes: 'bg-orange-400 text-black' }
-    if (estadoRaw === 'PAGADA' || estadoRaw === 'CON_PAGO') return { label: 'PAGADA', classes: 'bg-green-700 text-white' }
-    if (estadoRaw === 'ANULADA' || estadoRaw === 'CANCELADA') return { label: 'CANCELADA', classes: 'bg-red-600 text-white' }
-    if (estadoRaw === 'DISPONIBLE') return { label: 'DISPONIBLE', classes: 'bg-emerald-300 text-black' }
-    if (estadoRaw === 'TRANSFERIDA') return { label: 'TRANSFERIDA', classes: 'bg-purple-100 text-purple-800' }
-
-    return { label: estadoRaw || 'DESCONOCIDO', classes: 'bg-slate-100 text-slate-800' }
-  }
+  const getEstadoInfo = getBoletaEstadoMenuInfo
 
   // Cálculos para las Cards (Heurística: Visibilidad del estado del sistema)
   const stats = useMemo(() => {
     return boletas.reduce(
       (acc, boleta) => {
         const estadoRaw = boleta.estado?.toString().trim().toUpperCase() || ''
-        if (estadoRaw === 'DISPONIBLE') acc.disponibles++
+        if (boletaDisponibleParaVenta(boleta)) acc.disponibles++
         else if (estadoRaw === 'PAGADA' || estadoRaw === 'CON_PAGO') acc.vendidas++
         else if (estadoRaw === 'RESERVADA' && boleta.cliente_info) acc.reservadas++
         else if (estadoRaw === 'ABONADA') acc.abonadas++
@@ -213,7 +237,7 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
     if (filtroEstado) {
       result = result.filter(boleta => {
         const estadoRaw = boleta.estado?.toString().trim().toUpperCase() || ''
-        if (filtroEstado === 'DISPONIBLE') return estadoRaw === 'DISPONIBLE'
+        if (filtroEstado === 'DISPONIBLE') return boletaDisponibleParaVenta(boleta)
         if (filtroEstado === 'VENDIDAS') return estadoRaw === 'PAGADA' || estadoRaw === 'CON_PAGO'
         if (filtroEstado === 'RESERVADAS') return estadoRaw === 'RESERVADA' && boleta.cliente_info
         if (filtroEstado === 'ABONADAS') return estadoRaw === 'ABONADA'
@@ -223,27 +247,12 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
 
     // Filtro por búsqueda: nombre, cédula o número (sin mezclar mal)
     if (searchTerm.trim()) {
-      result = result.filter((boleta) => boletaMatchesSearch(boleta, searchTerm))
+      result = result.filter((boleta) => boletaMatchesSearchMode(boleta, searchTerm, searchMode))
 
-      const digits = searchTerm.replace(/\D/g, '')
-      const hasLetters = /[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/.test(searchTerm)
-      const preferCliente = hasLetters || digits.length > 4
-
-      if (preferCliente) {
-        const termNorm = normalizeText(searchTerm)
-        const scoreCliente = (b: Boleta) => {
-          const nombre = normalizeText(b.cliente_info?.nombre || '')
-          const id = String(b.cliente_info?.identificacion || '').replace(/\D/g, '')
-          if (digits.length > 4 && id === digits) return 0
-          if (digits.length > 0 && id.includes(digits)) return 1
-          if (nombre === termNorm) return 0
-          if (termNorm && nombre.startsWith(termNorm)) return 1
-          if (termNorm && nombre.includes(termNorm)) return 2
-          return 3
-        }
+      if (searchMode === 'nombre') {
         result = [...result].sort((a, b) => {
-          const sa = scoreCliente(a)
-          const sb = scoreCliente(b)
+          const sa = scoreBoletaNombreMatch(a, searchTerm)
+          const sb = scoreBoletaNombreMatch(b, searchTerm)
           if (sa !== sb) return sa - sb
           return a.numero - b.numero
         })
@@ -251,7 +260,67 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
     }
 
     return result
-  }, [boletas, searchTerm, filtroEstado])
+  }, [boletas, searchTerm, searchMode, filtroEstado])
+
+  const searchNumeroParsed = useMemo(() => {
+    if (searchMode !== 'boleta' || !searchTerm.trim()) return null
+    const digits = sanitizeBoletaSearchDigits(searchTerm.trim())
+    if (!digits) return null
+    const n = parseInt(digits.replace(/^0+/, '') || digits, 10)
+    return Number.isFinite(n) && n >= 0 ? n : null
+  }, [searchMode, searchTerm])
+
+  const showConsultaExterna =
+    !offlineMode &&
+    userRole === 'VENDEDOR' &&
+    searchMode === 'boleta' &&
+    searchNumeroParsed != null &&
+    filteredBoletas.length === 0 &&
+    Boolean(searchTerm.trim())
+
+  useEffect(() => {
+    if (!showConsultaExterna || !rifaInfo?.id) {
+      setConsultaExterna(null)
+      setConsultaExternaNotFound(false)
+      setConsultaExternaLoading(false)
+      return
+    }
+
+    let cancelled = false
+    const timer = window.setTimeout(async () => {
+      setConsultaExternaLoading(true)
+      setConsultaExternaNotFound(false)
+      setConsultaExterna(null)
+      try {
+        const res = await ventasApi.buscarBoletaPorNumero(rifaInfo.id, searchNumeroParsed!)
+        if (cancelled) return
+        if (res.data) {
+          setConsultaExterna(res.data as BoletaBusquedaExterna)
+          setConsultaExternaNotFound(false)
+        } else {
+          setConsultaExterna(null)
+          setConsultaExternaNotFound(true)
+        }
+      } catch (err: unknown) {
+        if (cancelled) return
+        const status = (err as { response?: { status?: number } })?.response?.status
+        if (status === 404) {
+          setConsultaExterna(null)
+          setConsultaExternaNotFound(true)
+        } else {
+          setConsultaExterna(null)
+          setConsultaExternaNotFound(false)
+        }
+      } finally {
+        if (!cancelled) setConsultaExternaLoading(false)
+      }
+    }, 350)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [showConsultaExterna, rifaInfo?.id, searchNumeroParsed])
 
   const paginatedBoletas = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage
@@ -323,6 +392,48 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
   }, [filteredBoletas, selectedIds.size])
 
   const allFilteredSelected = filteredBoletas.length > 0 && selectedIds.size === filteredBoletas.length
+
+  const selectedBoletas = useMemo(() => {
+    return boletas
+      .filter((b) => selectedIds.has(b.id))
+      .sort((a, b) => a.numero - b.numero)
+  }, [boletas, selectedIds])
+
+  const todasSeleccionadasDisponibles = useMemo(() => {
+    if (selectedBoletas.length === 0) return false
+    return selectedBoletas.every((b) => boletaDisponibleParaVenta(b))
+  }, [selectedBoletas])
+
+  const puedeVenderSeleccion =
+    filtroEstado === 'DISPONIBLE' &&
+    todasSeleccionadasDisponibles &&
+    selectedBoletas.length > 0 &&
+    Boolean(rifaInfo?.id)
+
+  const quitarSeleccion = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }, [])
+
+  const handleVenderSeleccionadas = useCallback(() => {
+    if (!puedeVenderSeleccion || !rifaInfo?.id) return
+    setIniciandoVenta(true)
+    try {
+      clearVentasNuevaDraft()
+      saveVentasPrefillBoletaIds(
+        rifaInfo.id,
+        selectedBoletas.map((b) => b.id)
+      )
+      router.push(
+        `/ventas/nueva-venta?auto=1&rifa_id=${encodeURIComponent(rifaInfo.id)}&source=boletas-list`
+      )
+    } finally {
+      setIniciandoVenta(false)
+    }
+  }, [puedeVenderSeleccion, rifaInfo?.id, router, selectedBoletas])
 
   // --- Helpers para descarga ---
   const imageToDataUrl = async (src: string): Promise<string | null> => {
@@ -408,15 +519,28 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
 
       // 4) Pre-cargar datos financieros de boletas ABONADAS seleccionadas
       const financieroMap: Record<string, { precio_boleta: number; total_pagado: number; saldo_pendiente: number }> = {}
-      const boletasAbonadas = boletasToDownload.filter(b => (b.estado ?? '').toString().trim().toUpperCase() === 'ABONADA')
-      if (boletasAbonadas.length > 0) {
+      const abonosMap: Record<string, { monto: number; fecha: string; estado?: string }[]> = {}
+      const boletasConDetalle = boletasToDownload.filter((b) => {
+        const e = (b.estado ?? '').toString().trim().toUpperCase()
+        return e === 'ABONADA' || e === 'PAGADA' || e === 'CON_PAGO' || e === 'VENDIDA'
+      })
+      if (boletasConDetalle.length > 0) {
         const detalles = await Promise.all(
-          boletasAbonadas.map(b =>
-            boletaApi.getBoletaById(b.id).then(r => ({ id: b.id, financiero: r.data.boleta_financiero })).catch(() => null)
+          boletasConDetalle.map((b) =>
+            boletaApi
+              .getBoletaById(b.id)
+              .then((r) => ({
+                id: b.id,
+                financiero: r.data.boleta_financiero,
+                abonos: r.data.abonos ?? [],
+              }))
+              .catch(() => null)
           )
         )
-        detalles.forEach(d => {
-          if (d?.financiero) financieroMap[d.id] = d.financiero
+        detalles.forEach((d) => {
+          if (!d) return
+          if (d.financiero) financieroMap[d.id] = d.financiero
+          if (d.abonos?.length) abonosMap[d.id] = d.abonos
         })
       }
 
@@ -440,9 +564,11 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
         const esCancelada = estadoNorm === 'ANULADA' || estadoNorm === 'CANCELADA'
         const pagadoWords = ['CON_PAGO', 'PAGADA', 'PAGADO', 'VENDIDA']
         const esPagada = pagadoWords.includes(estadoNorm) && tieneCliente
-        const esAbonada = estadoNorm === 'ABONADA'
         const fin = financieroMap[boleta.id]
         const saldoFin = fin ? fin.saldo_pendiente : null
+        const esAbonada =
+          estadoNorm === 'ABONADA' ||
+          (tieneCliente && typeof saldoFin === 'number' && saldoFin > 0 && !esPagada)
         const bonoCancelado =
           tieneCliente &&
           (pagadoWords.includes(estadoNorm) ||
@@ -501,7 +627,7 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
             </div>
             <div style="flex-shrink:0;position:relative;overflow:hidden;height:${ticketHeight}px;width:${BOLETA_RIGHT_WIDTH}px;">
               ${rightContent}
-              ${BOLETA_BONO_HTML(bonoCancelado)}
+              ${BOLETA_BONO_HTML(principal ?? boleta.numero, gift, bonoCancelado, ticketHeight, esAbonada, abonosMap[boleta.id])}
             </div>
           </div>
         `
@@ -605,7 +731,7 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
       </div> */}
 
       {/* Cards de Resumen - Clickeables como Filtros */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4 min-w-0">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 min-w-0">
         <BoletaFiltroStatCard
           label="Disponibles"
           count={stats.disponibles}
@@ -615,11 +741,6 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
             setFiltroEstado(filtroEstado === 'DISPONIBLE' ? null : 'DISPONIBLE')
             setCurrentPage(1)
           }}
-          icon={
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          }
         />
         <BoletaFiltroStatCard
           label="Vendidas"
@@ -630,11 +751,6 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
             setFiltroEstado(filtroEstado === 'VENDIDAS' ? null : 'VENDIDAS')
             setCurrentPage(1)
           }}
-          icon={
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          }
         />
         <BoletaFiltroStatCard
           label="Reservadas"
@@ -645,11 +761,6 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
             setFiltroEstado(filtroEstado === 'RESERVADAS' ? null : 'RESERVADAS')
             setCurrentPage(1)
           }}
-          icon={
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          }
         />
         <BoletaFiltroStatCard
           label="Abonadas"
@@ -660,62 +771,64 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
             setFiltroEstado(filtroEstado === 'ABONADAS' ? null : 'ABONADAS')
             setCurrentPage(1)
           }}
-          icon={
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          }
         />
       </div>
 
-      {/* Filtro activo indicator */}
-      {filtroEstado && (
-        <div className="flex items-center gap-2 px-1">
-          <span className="text-sm text-black font-semibold">Filtrando por:</span>
-          <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-bold">
-            {filtroEstado}
-            <button onClick={() => { setFiltroEstado(null); setCurrentPage(1) }} className="ml-1 hover:text-red-600 transition-colors">
-              ✕
-            </button>
-          </span>
-        </div>
-      )}
-
       {/* Buscador y Controles */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5">
+        <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Buscar boletas</p>
+        <div
+          className="flex gap-1 p-1 mb-3 bg-slate-100 rounded-xl overflow-x-auto snap-x snap-mandatory [-webkit-overflow-scrolling:touch]"
+          role="tablist"
+          aria-label="Tipo de búsqueda"
+        >
+          {BOLETA_SEARCH_TABS.map((tab) => {
+            const active = searchMode === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => {
+                  setSearchMode(tab.id)
+                  setSearchTerm('')
+                  setCurrentPage(1)
+                }}
+                className={`flex-1 min-w-[4.5rem] snap-start min-h-[44px] px-3 py-2 rounded-lg text-sm font-bold transition-colors touch-manipulation ${
+                  active ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
         <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 justify-between items-stretch lg:items-center">
-          <div className="w-full lg:w-2/3 flex gap-2">
+          <div className="w-full lg:w-2/3">
             <div className="relative flex-1 min-w-0">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg className="h-5 w-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" /></svg>
               </div>
               <input
                 type="search"
-                inputMode="search"
-                placeholder="Buscar por nombre, cédula o número..."
+                inputMode={BOLETA_SEARCH_TABS.find((t) => t.id === searchMode)?.inputMode as 'text' | 'numeric' | 'tel' | undefined}
+                placeholder={BOLETA_SEARCH_TABS.find((t) => t.id === searchMode)?.placeholder}
                 value={searchTerm}
                 onChange={(e) => {
-                  setSearchTerm(e.target.value)
+                  let v = e.target.value
+                  if (searchMode === 'boleta') {
+                    v = sanitizeBoletaSearchDigits(v)
+                  } else if (searchMode === 'cedula' || searchMode === 'telefono') {
+                    v = v.replace(/[^\d\s+\-()]/g, '')
+                  }
+                  setSearchTerm(v)
                   setCurrentPage(1)
                 }}
                 className="w-full pl-10 pr-4 py-3 min-h-[48px] border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-shadow text-black bg-white placeholder:text-slate-500 text-base"
+                autoComplete="off"
               />
             </div>
-            <button
-              type="button"
-              onClick={() => setFiltrosMobileOpen((v) => !v)}
-              className={`lg:hidden shrink-0 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl border ${
-                filtroEstado || filtrosMobileOpen
-                  ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
-                  : 'border-slate-300 bg-white text-slate-600'
-              }`}
-              aria-label="Filtros por estado"
-              aria-expanded={filtrosMobileOpen}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-              </svg>
-            </button>
           </div>
 
           <div className="flex items-center gap-3 w-full lg:w-auto">
@@ -795,8 +908,13 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
         )}
         {(searchTerm || filtroEstado) && (
           <button
-            onClick={() => { setSearchTerm(''); setFiltroEstado(null); setCurrentPage(1) }}
-            className="text-sm text-blue-600 hover:text-blue-800 font-medium underline-offset-2 hover:underline"
+            type="button"
+            onClick={() => {
+              setSearchTerm('')
+              setFiltroEstado(null)
+              setCurrentPage(1)
+            }}
+            className="text-sm text-blue-600 hover:text-blue-800 font-medium underline-offset-2 hover:underline min-h-[44px] px-2"
           >
             Limpiar filtros
           </button>
@@ -804,39 +922,120 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
       </div>
 
       {/* Barra de acciones de selección */}
-      {selectedIds.size > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
-          <div className="flex items-center gap-3">
+      {!offlineMode && selectedIds.size > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm space-y-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="text-sm font-semibold text-blue-800">
-              {selectedIds.size} boleta{selectedIds.size !== 1 ? 's' : ''} seleccionada{selectedIds.size !== 1 ? 's' : ''}
+              {selectedIds.size} boleta{selectedIds.size !== 1 ? 's' : ''} seleccionada
+              {selectedIds.size !== 1 ? 's' : ''}
             </span>
             <button
+              type="button"
               onClick={() => setSelectedIds(new Set())}
-              className="text-xs text-blue-600 hover:text-blue-800 underline"
+              className="text-xs text-blue-600 hover:text-blue-800 underline min-h-[44px] px-1"
             >
               Deseleccionar todo
             </button>
           </div>
-          <button
-            onClick={handleBulkDownload}
-            disabled={downloading}
-            className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-          >
-            {downloading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                Descargando {downloadProgress.current}/{downloadProgress.total}...
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Descargar ({selectedIds.size})
-              </>
+          <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-1">
+            {selectedBoletas.map((boleta) => {
+              const numeroFmt = formatBoletaNumeros(boleta.numeros, boleta.numero)
+              return (
+                <span
+                  key={boleta.id}
+                  className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-lg bg-white border border-blue-200 text-sm font-mono font-semibold text-slate-800 shadow-sm"
+                >
+                  #{numeroFmt}
+                  <button
+                    type="button"
+                    onClick={() => quitarSeleccion(boleta.id)}
+                    className="p-1.5 min-h-[32px] min-w-[32px] rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    aria-label={`Quitar boleta ${numeroFmt} de la selección`}
+                    title="Quitar de la selección"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              )
+            })}
+          </div>
+          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-end gap-2 pt-1">
+            {puedeVenderSeleccion && (
+              <button
+                type="button"
+                onClick={handleVenderSeleccionadas}
+                disabled={iniciandoVenta || downloading}
+                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-sm order-first sm:order-none"
+              >
+                {iniciandoVenta ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                    Abriendo venta…
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                      />
+                    </svg>
+                    Vender ({selectedIds.size})
+                  </>
+                )}
+              </button>
             )}
-          </button>
+            <button
+              type="button"
+              onClick={handleBulkDownload}
+              disabled={downloading || iniciandoVenta}
+              className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            >
+              {downloading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  Descargando {downloadProgress.current}/{downloadProgress.total}...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                    />
+                  </svg>
+                  Descargar ({selectedIds.size})
+                </>
+              )}
+            </button>
+          </div>
+          {filtroEstado !== 'DISPONIBLE' && selectedIds.size > 0 && (
+            <p className="text-xs text-blue-700/90">
+              Para vender varias a la vez, usa el filtro <strong>Disponibles</strong> y selecciona solo boletas
+              disponibles.
+            </p>
+          )}
+          {filtroEstado === 'DISPONIBLE' && selectedIds.size > 0 && !todasSeleccionadasDisponibles && (
+            <p className="text-xs text-amber-800">
+              Quita de la selección cualquier boleta que ya no esté disponible para habilitar <strong>Vender</strong>.
+            </p>
+          )}
         </div>
+      )}
+
+      {showConsultaExterna && (
+        <BoletaConsultaExternaPanel
+          loading={consultaExternaLoading}
+          notFound={consultaExternaNotFound}
+          numeroBuscado={searchNumeroParsed}
+          data={consultaExterna}
+        />
       )}
 
       {/* Grilla de números (doble oportunidad) */}
@@ -874,7 +1073,11 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
         <div className="lg:hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           {paginatedBoletas.length === 0 ? (
             <div className="px-4 py-14 text-center text-slate-500 text-sm">
-              {searchTerm ? 'No hay resultados para tu búsqueda.' : 'Aún no hay boletas en este proyecto.'}
+              {showConsultaExterna && (consultaExternaLoading || consultaExterna || consultaExternaNotFound)
+                ? null
+                : searchTerm
+                  ? 'No hay resultados para tu búsqueda.'
+                  : 'Aún no hay boletas en este proyecto.'}
             </div>
           ) : (
             <ul className="divide-y divide-slate-100">
@@ -887,23 +1090,28 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
                 const numeroFmt = formatBoletaNumeros(boleta.numeros, boleta.numero)
                 return (
                   <li key={boleta.id} className="flex items-center gap-2 px-2 sm:px-3 py-2.5 min-h-[60px]">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(boleta.id)}
-                      onChange={() => toggleSelect(boleta.id)}
-                      className="w-4 h-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                      aria-label={`Seleccionar boleta ${numeroFmt}`}
-                    />
+                    {!offlineMode && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(boleta.id)}
+                        onChange={() => toggleSelect(boleta.id)}
+                        className="w-4 h-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        aria-label={`Seleccionar boleta ${numeroFmt}`}
+                      />
+                    )}
                     <div className="flex-1 min-w-0 pr-1">
                       <p className="font-mono font-bold text-slate-900 text-sm leading-tight truncate">
                         #{numeroFmt}
                       </p>
                       <p className="text-xs text-slate-500 truncate italic mt-0.5">{asignado}</p>
                     </div>
-                    <span
-                      className={`shrink-0 max-w-[88px] text-center inline-flex px-2 py-1 text-[10px] sm:text-xs font-bold rounded-full leading-tight ${estado.classes}`}
-                    >
-                      {estado.label}
+                    <span className="shrink-0 flex items-center gap-1">
+                      <span
+                        className={`max-w-[88px] text-center inline-flex px-2 py-1 text-[10px] sm:text-xs font-bold rounded-full leading-tight ${estado.classes}`}
+                      >
+                        {estado.label}
+                      </span>
+                      {renderBotonDesbloquear(boleta, true)}
                     </span>
                     {renderAccionesBoleta(boleta, true)}
                   </li>
@@ -921,15 +1129,17 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50/80 border-b border-slate-200">
               <tr>
-                <th className="px-4 py-4 text-center">
-                  <input
-                    type="checkbox"
-                    checked={allFilteredSelected}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                    title="Seleccionar todas"
-                  />
-                </th>
+                {!offlineMode && (
+                  <th className="px-4 py-4 text-center">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      title="Seleccionar todas"
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Número</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Estado</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Cliente</th>
@@ -939,17 +1149,25 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Vendedor</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Nota</th>
                 {/* <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">QR</th> */}
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
+                {!offlineMode && (
+                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">
+                    Acciones
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedBoletas.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-6 py-16 text-center text-slate-500">
-                    <div className="flex flex-col items-center justify-center">
-                      <svg className="w-12 h-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                      <p className="text-base">{searchTerm ? 'No hay resultados para tu búsqueda.' : 'Aún no hay boletas en este proyecto.'}</p>
-                    </div>
+                  <td colSpan={offlineMode ? 9 : 11} className="px-6 py-16 text-center text-slate-500">
+                    {showConsultaExterna && (consultaExternaLoading || consultaExterna || consultaExternaNotFound) ? (
+                      <span className="sr-only">Consulta de boleta en curso o mostrada arriba</span>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center">
+                        <svg className="w-12 h-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <p className="text-base">{searchTerm ? 'No hay resultados para tu búsqueda.' : 'Aún no hay boletas en este proyecto.'}</p>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -957,22 +1175,27 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
                   const estado = getEstadoInfo(boleta)
                   return (
                     <tr key={boleta.id} className="hover:bg-slate-50/80 transition-colors group">
-                      <td className="px-4 py-4 text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(boleta.id)}
-                          onChange={() => toggleSelect(boleta.id)}
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                        />
-                      </td>
+                      {!offlineMode && (
+                        <td className="px-4 py-4 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(boleta.id)}
+                            onChange={() => toggleSelect(boleta.id)}
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                        </td>
+                      )}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-mono font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded inline-block">
                           {formatBoletaNumeros(boleta.numeros, boleta.numero)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-3 py-1 text-xs font-bold rounded-full ${estado.classes}`}>
-                          {estado.label}
+                        <span className="inline-flex flex-wrap items-center gap-1.5">
+                          <span className={`inline-flex px-3 py-1 text-xs font-bold rounded-full ${estado.classes}`}>
+                            {estado.label}
+                          </span>
+                          {renderBotonDesbloquear(boleta, false)}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -1063,9 +1286,11 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
                           <span className="text-slate-400 text-xs italic">N/A</span>
                         )}
                       </td> */}
-                      <td className="px-4 py-4 whitespace-nowrap text-right">
-                        {renderAccionesBoleta(boleta, false)}
-                      </td>
+                      {!offlineMode && (
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                          {renderAccionesBoleta(boleta, false)}
+                        </td>
+                      )}
                     </tr>
                   )
                 })
@@ -1100,7 +1325,7 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
         </div>
       )}
 
-      {menuBoleta && (
+      {menuBoleta && !offlineMode && (
         <BoletaOpcionesMenu
           open
           onClose={closeMenu}
@@ -1112,6 +1337,7 @@ export default function BoletaList({ boletas, loading, rifaInfo }: BoletaListPro
           onEditarNota={() => handleEditNota(menuBoleta)}
           rifaId={rifaInfo?.id ?? null}
           onIrAVender={(href) => router.push(href)}
+          onIrAAbonar={(href) => router.push(href)}
           mode={isDesktop ? 'popover' : 'sheet'}
           anchorEl={menuAnchorEl}
         />

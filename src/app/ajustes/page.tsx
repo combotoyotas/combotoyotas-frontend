@@ -10,6 +10,7 @@ import {
   type MedioPagoItem,
 } from '@/lib/ajustesApi'
 import PlantillasWhatsappBoleta from '@/components/ajustes/PlantillasWhatsappBoleta'
+import PlantillasWhatsappCliente from '@/components/ajustes/PlantillasWhatsappCliente'
 
 type ConfigItem = MedioPagoItem | LineaVentaItem
 
@@ -180,33 +181,38 @@ export default function AjustesPage() {
     reservada: '',
     abonada: '',
   })
+  const [plantillaClienteWa, setPlantillaClienteWa] = useState<{ plantilla: string }>({ plantilla: '' })
 
   const load = useCallback(async (userRol: string) => {
     setLoading(true)
     setError(null)
     try {
       if (userRol === 'SUPER_ADMIN') {
-        const [gMedios, gLineas, comision, plantillas] = await Promise.all([
+        const [gMedios, gLineas, comision, plantillas, plantillaCliente] = await Promise.all([
           ajustesApi.getGlobalMedios(),
           ajustesApi.getGlobalLineas(),
           ajustesApi.getComisionVendedores(),
           ajustesApi.getGlobalWhatsappPlantillasBoleta(),
+          ajustesApi.getGlobalWhatsappPlantillaCliente(),
         ])
         setMedios(gMedios)
         setLineas(gLineas)
         setPlantillasWa(plantillas)
+        setPlantillaClienteWa(plantillaCliente)
         setComisionPagadaPct(
           String(comision.comision_vendedores_pagada_pct ?? comision.comision_vendedores_pct ?? 25)
         )
         setComisionAbonoPct(String(comision.comision_vendedores_abono_pct ?? 20))
       } else if (userRol === 'VENDEDOR') {
-        const [data, plantillas] = await Promise.all([
+        const [data, plantillas, plantillaCliente] = await Promise.all([
           ajustesApi.getMisAjustes(),
           ajustesApi.getWhatsappPlantillasBoleta(),
+          ajustesApi.getWhatsappPlantillaCliente(),
         ])
         setMedios(data.medios_pago)
         setLineas(data.lineas_venta)
         setPlantillasWa(plantillas)
+        setPlantillaClienteWa(plantillaCliente)
       } else {
         router.replace('/dashboard')
         return
@@ -441,6 +447,12 @@ export default function AjustesPage() {
             mode={isSuper ? 'global' : 'vendedor'}
             initial={plantillasWa}
             onSaved={setPlantillasWa}
+          />
+
+          <PlantillasWhatsappCliente
+            mode={isSuper ? 'global' : 'vendedor'}
+            initial={plantillaClienteWa}
+            onSaved={setPlantillaClienteWa}
           />
 
           <section className="bg-white border border-slate-200 rounded-xl p-5 mb-6 shadow-sm">

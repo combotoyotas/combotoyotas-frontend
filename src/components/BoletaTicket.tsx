@@ -7,9 +7,19 @@ import {
   BOLETA_LEFT_WIDTH,
   BOLETA_RIGHT_WIDTH,
   BOLETA_DEFAULT_HEIGHT,
+  BOLETA_ARTE_BONO,
+  bonoFooterHeightPx,
+  bonoNumeroHeightPx,
   boletaHeightForImage,
 } from '@/constants/boletaDimensions'
 import { getPrincipalGift } from '@/utils/formatBoletaNumeros'
+import {
+  type AbonoBonoLine,
+  bonoAbonoLineFontPx,
+  bonoAbonoLinesGapPx,
+  formatMontoBono,
+  resolveBonoFooterDetalle,
+} from '@/utils/boletaBonoFooter'
 
 interface BoletaTicketProps {
   qrUrl: string
@@ -30,6 +40,7 @@ interface BoletaTicketProps {
   nota?: string | null
   hideQr?: boolean
   hideIdentificacion?: boolean
+  abonos?: AbonoBonoLine[] | null
 }
 
 export default function BoletaTicket(props: BoletaTicketProps) {
@@ -47,6 +58,7 @@ export default function BoletaTicket(props: BoletaTicketProps) {
     nota,
     hideQr = false,
     hideIdentificacion = false,
+    abonos = null,
   } = props
 
   const [imageError, setImageError] = useState(false)
@@ -96,12 +108,19 @@ export default function BoletaTicket(props: BoletaTicketProps) {
 
   const bonoCancelado =
     tieneCliente &&
-    (estadoPagadoWords.has(estadoNorm) ||
+    (esPagada ||
+      estadoPagadoWords.has(estadoNorm) ||
       (typeof deudaNum === 'number' &&
         deudaNum <= 0 &&
         !esReservada &&
         !esAbonada &&
         !esCancelada))
+
+  const bonoDetalle = resolveBonoFooterDetalle({
+    bonoCancelado,
+    esAbonada,
+    abonos,
+  })
 
   type BarVariant = 'cancelada' | 'bloqueada' | 'reservada' | 'pagada' | 'abonada' | 'disponible'
 
@@ -130,6 +149,15 @@ export default function BoletaTicket(props: BoletaTicketProps) {
     !(esReservada && !tieneCliente) &&
     barVariant !== 'disponible' &&
     tieneCliente
+
+  const bonoBandPx = bonoFooterHeightPx(ticketHeight)
+  const bonoFooterEm = Math.max(9, Math.round(bonoBandPx * 0.2))
+  const bonoAbonoCount = bonoDetalle.kind === 'abonos' ? bonoDetalle.lineas.length : 0
+  const bonoAbonoLinePx =
+    bonoAbonoCount > 0 ? bonoAbonoLineFontPx(bonoBandPx, bonoAbonoCount) : 0
+  const bonoAbonoGapPx = bonoAbonoCount > 0 ? bonoAbonoLinesGapPx(bonoAbonoCount) : 0
+  const bonoCanceladoPx = Math.max(16, Math.round(bonoBandPx * 0.54))
+  const numeroFooterEm = Math.max(8, Math.round(bonoNumeroHeightPx(ticketHeight) * 0.21))
 
   return (
     <div
@@ -231,10 +259,73 @@ export default function BoletaTicket(props: BoletaTicketProps) {
             </div>
           </div>
         )}
-        <div className="boleta-bono">
-          <div className="boleta-bono__title">Bono de cancelación</div>
-          <div className={`boleta-bono__value${bonoCancelado ? ' is-cancelado' : ''}`}>
-            {bonoCancelado ? 'Cancelado' : 'Pendiente'}
+        <div
+          className="boleta-bono-footer"
+          style={{
+            bottom: BOLETA_ARTE_BONO.bottom,
+            gap: BOLETA_ARTE_BONO.gap,
+            paddingRight: BOLETA_ARTE_BONO.right,
+          }}
+        >
+          <div
+            className="boleta-bono-footer__numero"
+            style={{
+              width: BOLETA_ARTE_BONO.numeroWidth,
+              height: `${bonoNumeroHeightPx(ticketHeight)}px`,
+              flex: `0 0 auto`,
+              fontSize: `${numeroFooterEm}px`,
+            }}
+          >
+            <span className="boleta-bono-footer__numero-principal">
+              {String(numDisplay ?? 0).padStart(4, '0')}
+            </span>
+            {gift != null && (
+              <span className="boleta-bono-footer__numero-regalo">
+                +{String(gift).padStart(4, '0')}
+              </span>
+            )}
+          </div>
+          <div
+            className={`boleta-bono-footer__bono${
+              bonoDetalle.kind === 'cancelado'
+                ? ' boleta-bono-footer__bono--cancelado'
+                : bonoDetalle.kind === 'abonos'
+                  ? ` boleta-bono-footer__bono--abonos-${Math.min(bonoDetalle.lineas.length, 4)}`
+                  : ''
+            }`}
+            style={{
+              width: BOLETA_ARTE_BONO.bonoWidth,
+              height: `${bonoFooterHeightPx(ticketHeight)}px`,
+              flex: `0 0 auto`,
+              fontSize: `${bonoFooterEm}px`,
+            }}
+          >
+            <div className="boleta-bono-footer__bono-title">BONO DE CANCELACION</div>
+            {bonoDetalle.kind === 'abonos' && (
+              <div
+                className="boleta-bono-footer__bono-abonos"
+                style={{ gap: `${bonoAbonoGapPx}px` }}
+              >
+                {bonoDetalle.lineas.map((linea, idx) => (
+                  <div
+                    key={`${linea.fechaLabel}-${linea.monto}-${idx}`}
+                    className="boleta-bono-footer__bono-abono-linea"
+                    style={{ fontSize: `${bonoAbonoLinePx}px`, lineHeight: bonoAbonoCount >= 4 ? 1.05 : 1.15 }}
+                  >
+                    <span className="boleta-bono-footer__bono-abono-monto">{formatMontoBono(linea.monto)}</span>
+                    <span className="boleta-bono-footer__bono-abono-sep" aria-hidden>
+                      ·
+                    </span>
+                    <span className="boleta-bono-footer__bono-abono-fecha">{linea.fechaLabel}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {bonoDetalle.kind === 'cancelado' && (
+              <div className="boleta-bono-footer__bono-estado" style={{ fontSize: `${bonoCanceladoPx}px` }}>
+                CANCELADO
+              </div>
+            )}
           </div>
         </div>
       </div>

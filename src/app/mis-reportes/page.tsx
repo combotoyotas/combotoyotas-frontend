@@ -19,8 +19,6 @@ export default function MisReportesPage() {
   const [rifas, setRifas] = useState<Rifa[]>([]);
   const [loading, setLoading] = useState(true);
   const [accesoDenegado, setAccesoDenegado] = useState(false);
-  const [role, setRole] = useState<string>('');
-  const [scope, setScope] = useState<Scope>('mis-ventas');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -39,9 +37,6 @@ export default function MisReportesPage() {
         setLoading(false);
         return;
       }
-      setRole(userRole);
-      // ADMIN puede ver General; VENDEDOR y SUPER_ADMIN en esta ruta inician en propios
-      setScope(userRole === 'ADMIN' ? 'global' : 'mis-ventas');
     } catch {
       router.push('/login');
       return;
@@ -90,52 +85,15 @@ export default function MisReportesPage() {
     </div>
   );
 
-  const esAdmin = role === 'ADMIN';
-  const activeScope: Scope = esAdmin ? scope : 'mis-ventas';
-  const title =
-    activeScope === 'global' ? 'Reportes generales' : 'Mis Reportes';
+  const activeScope: Scope = 'mis-ventas';
 
   return (
     <div className="w-full min-w-0">
-      {esAdmin && (
-        <div className="px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
-          <div className="inline-flex border border-slate-200 bg-white shadow-sm overflow-hidden rounded-xl">
-            <button
-              type="button"
-              onClick={() => setScope('global')}
-              className={`px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wide min-h-[44px] transition-colors ${
-                activeScope === 'global'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-white text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              General
-            </button>
-            <button
-              type="button"
-              onClick={() => setScope('mis-ventas')}
-              className={`px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wide min-h-[44px] border-l border-slate-200 transition-colors ${
-                activeScope === 'mis-ventas'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-white text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              Mis reportes
-            </button>
-          </div>
-          <p className="mt-2 text-xs sm:text-sm text-slate-500 max-w-xl">
-            {activeScope === 'global'
-              ? 'Vista de toda la rifa: estadísticas y ventas del proyecto.'
-              : 'Solo tus ventas y recaudos registrados por ti.'}
-          </p>
-        </div>
-      )}
-
       <AnalyticsDashboard
         key={activeScope}
         rifas={rifas}
         scope={activeScope}
-        title={title}
+        title="Mis Reportes"
         esSuperAdmin={false}
       />
     </div>

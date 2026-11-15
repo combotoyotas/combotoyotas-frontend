@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, ShoppingCart, Ticket, Users, Menu } from 'lucide-react'
 import { UserRole } from '@/config/modules'
+import { getModuleLastPath } from '@/lib/moduleLastPath'
+import { resolveVentasEntryHref } from '@/lib/ventasNavigation'
 
 type Props = {
   role: UserRole | null
@@ -12,24 +14,29 @@ type Props = {
 
 export default function MobileTabBar({ role, onOpenMenu }: Props) {
   const pathname = usePathname() || '/'
+  const ventasHref = resolveVentasEntryHref()
+  const esVendedor = role === 'VENDEDOR'
 
   const items = [
-    { href: '/dashboard', label: 'Inicio', icon: LayoutDashboard, match: (p: string) => p === '/dashboard' },
+    { id: 'dashboard', href: '/dashboard', label: 'Inicio', icon: LayoutDashboard, match: (p: string) => p === '/dashboard' },
     {
-      href: '/ventas',
+      id: 'ventas',
+      href: ventasHref,
       label: 'Ventas',
       icon: ShoppingCart,
       match: (p: string) => p.startsWith('/ventas'),
-      hidden: !role,
+      hidden: !role || esVendedor,
     },
     {
-      href: '/boletas/ver',
+      id: 'boletas',
+      href: getModuleLastPath('boletas', '/boletas/ver'),
       label: 'Boletas',
       icon: Ticket,
       match: (p: string) => p.startsWith('/boletas'),
       hidden: !role,
     },
     {
+      id: 'clientes',
       href: '/clientes',
       label: 'Clientes',
       icon: Users,
@@ -37,20 +44,25 @@ export default function MobileTabBar({ role, onOpenMenu }: Props) {
     },
   ]
 
+  const tabItems = items.filter((item) => !item.hidden)
+  const colCount = tabItems.length + 1
+
   return (
     <nav
       className="mobile-tabbar lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-slate-200/80 bg-white/95 backdrop-blur-md"
       style={{ boxShadow: '0 -8px 24px rgb(15 23 42 / 0.06)' }}
       aria-label="Navegación principal"
     >
-      <div className="grid grid-cols-5 h-16">
-        {items.map((item) => {
-          if (item.hidden) return <span key={item.href} />
+      <div
+        className="grid h-16"
+        style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))` }}
+      >
+        {tabItems.map((item) => {
           const active = item.match(pathname)
           const Icon = item.icon
           return (
             <Link
-              key={item.href}
+              key={item.id}
               href={item.href}
               className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium ${
                 active ? 'text-indigo-600' : 'text-slate-400'

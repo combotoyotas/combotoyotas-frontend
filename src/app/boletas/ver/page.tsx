@@ -7,6 +7,17 @@ import { Boleta, BoletaListResponse } from '@/types/boleta'
 import { Rifa } from '@/types/rifa'
 import { rifaApi } from '@/lib/rifaApi'
 import BoletaList from '@/components/BoletaList'
+import OfflineBoletasBanner from '@/components/boletas/OfflineBoletasBanner'
+import { inventarioApi } from '@/lib/inventarioApi'
+import {
+  getVendorUserIdFromStorage,
+  isNetworkUnavailableError,
+  loadVendorBoletasOffline,
+  loadVendorRifasOffline,
+  saveVendorBoletasOffline,
+  saveVendorCuadriculaOffline,
+  saveVendorRifasOffline,
+} from '@/lib/boletasOfflineStore'
 
 export default function VerBoletasPage() {
   const [boletas, setBoletas] = useState<Boleta[]>([])
@@ -16,7 +27,14 @@ export default function VerBoletasPage() {
   const [loadingBoletas, setLoadingBoletas] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [userNombre, setUserNombre] = useState('')
+  const [descargandoInventario, setDescargandoInventario] = useState(false)
+  const [offlineMode, setOfflineMode] = useState(false)
+  const [offlineSavedAt, setOfflineSavedAt] = useState<number | null>(null)
   const router = useRouter()
+
+  const isVendedor = userRole === 'VENDEDOR'
 
   // 1. Efecto inicial: Verificación de sesión y carga de rifas
   useEffect(() => {
@@ -31,6 +49,8 @@ export default function VerBoletasPage() {
     try {
       const user = JSON.parse(userData)
       setUserRole(String(user.rol || '').toUpperCase())
+      setUserId(user.id ? String(user.id) : null)
+      setUserNombre(String(user.nombre || user.name || 'vendedor'))
       
       if (user.rol !== 'SUPER_ADMIN' && user.rol !== 'ADMIN' && user.rol !== 'VENDEDOR') {
         setError('No tienes permisos para acceder a este módulo')
@@ -53,13 +73,41 @@ export default function VerBoletasPage() {
     }
   }, [rifas]) // Solo se ejecuta cuando se llena la lista de rifas
 
+  useEffect(() => {
+    if (!isVendedor || !userId) return
+    const syncOnline = () => {
+      if (!navigator.onLine) return
+      fetchRifas()
+      if (selectedRifa) fetchBoletas(selectedRifa)
+    }
+    window.addEventListener('online', syncOnline)
+    return () => window.removeEventListener('online', syncOnline)
+  }, [isVendedor, userId, selectedRifa])
+
   const fetchRifas = async () => {
     try {
       setLoading(true)
       const response = await rifaApi.getRifasOperativas()
       setRifas(response.data)
       setError(null)
+      setOfflineMode(false)
+      setOfflineSavedAt(null)
+      const vendorId = getVendorUserIdFromStorage()
+      if (vendorId) {
+        await saveVendorRifasOffline(vendorId, response.data)
+      }
     } catch (err) {
+      const vendorId = getVendorUserIdFromStorage()
+      if (vendorId && isNetworkUnavailableError(err)) {
+        const cached = await loadVendorRifasOffline(vendorId)
+        if (cached?.data?.length) {
+          setRifas(cached.data)
+          setOfflineMode(true)
+          setOfflineSavedAt(cached.savedAt)
+          setError(null)
+          return
+        }
+      }
       setError(err instanceof Error ? err.message : 'Error al cargar proyectos')
     } finally {
       setLoading(false)
@@ -73,16 +121,66 @@ export default function VerBoletasPage() {
       const response: BoletaListResponse = await boletaApi.getBoletasByRifa(rifaId)
       setBoletas(response.data)
       setError(null)
+      const vendorId = getVendorUserIdFromStorage()
+      if (vendorId) {
+        await saveVendorBoletasOffline(vendorId, rifaId, response.data)
+        if (!offlineMode) {
+          setOfflineSavedAt(Date.now())
+        }
+        const rifa = rifas.find((r) => r.id === rifaId)
+        try {
+          const grid = await boletaApi.getBoletasCuadricula(rifaId)
+          await saveVendorCuadriculaOffline(vendorId, rifaId, {
+            boletas: grid.data.boletas,
+            alcance: grid.data.alcance,
+            rifaNombre: grid.data.rifa?.nombre || rifa?.nombre,
+          })
+        } catch {
+          /* la cuadrícula se guardará al abrir esa pantalla */
+        }
+      }
+      if (navigator.onLine) {
+        setOfflineMode(false)
+      }
     } catch (err) {
+      const vendorId = getVendorUserIdFromStorage()
+      if (vendorId && isNetworkUnavailableError(err)) {
+        const cached = await loadVendorBoletasOffline(vendorId, rifaId)
+        if (cached?.data) {
+          setBoletas(cached.data)
+          setOfflineMode(true)
+          setOfflineSavedAt(cached.savedAt)
+          setError(null)
+          return
+        }
+      }
       setError(err instanceof Error ? err.message : 'Error al cargar boletas')
     } finally {
       setLoadingBoletas(false)
     }
   }
 
+  const reintentarConexion = async () => {
+    await fetchRifas()
+    if (selectedRifa) await fetchBoletas(selectedRifa)
+  }
+
   const handleRifaChange = (rifaId: string) => {
     setSelectedRifa(rifaId)
     fetchBoletas(rifaId)
+  }
+
+  const descargarInventarioPdf = async () => {
+    if (!selectedRifa || !userId || descargandoInventario) return
+    setDescargandoInventario(true)
+    setError(null)
+    try {
+      await inventarioApi.descargarInventarioPdf(selectedRifa, userId, userNombre)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo descargar el inventario')
+    } finally {
+      setDescargandoInventario(false)
+    }
   }
 
   // --- Renderizado de estados de error y carga ---
@@ -147,6 +245,13 @@ export default function VerBoletasPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+        {isVendedor && offlineMode && (
+          <OfflineBoletasBanner
+            savedAt={offlineSavedAt}
+            onRetry={reintentarConexion}
+            retrying={loading || loadingBoletas}
+          />
+        )}
         {error && (
           <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-r-lg mb-6 shadow-sm flex items-center gap-3">
              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
@@ -194,6 +299,25 @@ export default function VerBoletasPage() {
               </div>
             )}
           </div>
+
+          {selectedRifa && userRole === 'VENDEDOR' && userId && !offlineMode && (
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={descargarInventarioPdf}
+                disabled={descargandoInventario}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 min-h-[48px] px-4 py-2.5 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 text-sm font-semibold hover:bg-slate-100 disabled:opacity-50 transition-colors"
+              >
+                <svg className="w-5 h-5 shrink-0 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                {descargandoInventario ? 'Generando PDF…' : 'Descargar inventario'}
+              </button>
+              <p className="text-xs text-slate-500 mt-2">
+                Mismo reporte PDF que en inventario por vendedor (tus boletas asignadas en este proyecto).
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Listado de Boletas (Hijo) */}
@@ -202,6 +326,8 @@ export default function VerBoletasPage() {
             boletas={boletas}
             loading={loadingBoletas}
             rifaInfo={rifas.find(r => r.id === selectedRifa) || null}
+            onRefreshBoletas={() => fetchBoletas(selectedRifa)}
+            offlineMode={isVendedor && offlineMode}
           />
         ) : !loading && (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-20 text-center">

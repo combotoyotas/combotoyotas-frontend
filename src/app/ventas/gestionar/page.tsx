@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { setModuleLastPath } from '@/lib/moduleLastPath'
+import { useRouter, useSearchParams } from 'next/navigation'
 import ClienteSearch from '@/components/ventas/ClienteSearch'
 import { Cliente } from '@/types/ventas'
 import { ventasApi } from '@/lib/ventasApi'
@@ -30,8 +31,14 @@ interface ResultadoBusquedaBoleta {
   boletas: any[]
 }
 
-export default function GestionarAbonosPage() {
+function GestionarAbonosPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const autoBusquedaEjecutada = useRef(false)
+
+  useEffect(() => {
+    setModuleLastPath('ventas', '/ventas/gestionar')
+  }, [])
 
   const [modoBusqueda, setModoBusqueda] = useState<'boleta' | 'cliente'>('boleta')
   const [numeroBoleta, setNumeroBoleta] = useState('')
@@ -50,6 +57,80 @@ export default function GestionarAbonosPage() {
   const volverVentas = () => router.push('/ventas')
   const volverDashboard = () => router.push('/mis-reportes')
 
+  const aplicarClienteYVentaDesdeResultado = useCallback(
+    (resultado: ResultadoBusquedaBoleta) => {
+      setClienteDeBoleta({
+        id: resultado.cliente.id,
+        nombre: resultado.cliente.nombre,
+        telefono: resultado.cliente.telefono,
+        email: resultado.cliente.email,
+        identificacion: resultado.cliente.identificacion,
+        direccion: resultado.cliente.direccion,
+      })
+      setVentaConBoletaId(resultado.venta_id)
+    },
+    []
+  )
+
+  const buscarPorNumeroBoleta = useCallback(
+    async (
+      num: number,
+      options?: { rifaId?: string; ventaIdPreferida?: string | null }
+    ) => {
+      setBuscando(true)
+      setErrorBusqueda(null)
+      setResultadosBoleta(null)
+      setClienteDeBoleta(null)
+      setBoletaBuscadaNum(null)
+      setBoletaBuscadaNumeros(null)
+      setVentaConBoletaId(null)
+
+      try {
+        const response = await ventasApi.buscarBoletaParaAbono(num, options?.rifaId)
+        const data = response.data
+
+        if (!data.encontrada) {
+          setErrorBusqueda(data.mensaje || 'Boleta no encontrada o sin saldo pendiente')
+          return
+        }
+
+        setResultadosBoleta(data.resultados)
+        setBoletaBuscadaNum(num)
+        const primero = data.resultados?.[0]
+        setBoletaBuscadaNumeros(
+          Array.isArray(primero?.boleta_buscada_numeros) && primero.boleta_buscada_numeros.length > 0
+            ? primero.boleta_buscada_numeros.map(Number)
+            : [num]
+        )
+
+        const ventaIdPref = options?.ventaIdPreferida?.trim()
+        if (ventaIdPref) {
+          const match = data.resultados.find(
+            (r: ResultadoBusquedaBoleta) => String(r.venta_id) === ventaIdPref
+          )
+          if (match) {
+            aplicarClienteYVentaDesdeResultado(match)
+            return
+          }
+        }
+
+        const clientesUnicos = new Map<string, ResultadoBusquedaBoleta>()
+        for (const r of data.resultados) {
+          if (r.cliente?.id) clientesUnicos.set(r.cliente.id, r)
+        }
+
+        if (clientesUnicos.size === 1) {
+          aplicarClienteYVentaDesdeResultado(data.resultados[0])
+        }
+      } catch (err: any) {
+        setErrorBusqueda(err.message || 'Error buscando boleta')
+      } finally {
+        setBuscando(false)
+      }
+    },
+    [aplicarClienteYVentaDesdeResultado]
+  )
+
   const buscarPorBoleta = async () => {
     const digits = sanitizeBoletaSearchDigits(numeroBoleta.trim())
     const num = parseInt(digits.replace(/^0+/, '') || digits, 10)
@@ -57,59 +138,25 @@ export default function GestionarAbonosPage() {
       setErrorBusqueda('Ingresa un número de boleta válido (cualquiera de los dos del par)')
       return
     }
-
-    setBuscando(true)
-    setErrorBusqueda(null)
-    setResultadosBoleta(null)
-    setClienteDeBoleta(null)
-    setBoletaBuscadaNum(null)
-    setBoletaBuscadaNumeros(null)
-    setVentaConBoletaId(null)
-
-    try {
-      const response = await ventasApi.buscarBoletaParaAbono(num)
-      const data = response.data
-
-      if (!data.encontrada) {
-        setErrorBusqueda(data.mensaje || 'Boleta no encontrada o sin saldo pendiente')
-        return
-      }
-
-      setResultadosBoleta(data.resultados)
-      setBoletaBuscadaNum(num)
-      const primero = data.resultados?.[0]
-      setBoletaBuscadaNumeros(
-        Array.isArray(primero?.boleta_buscada_numeros) && primero.boleta_buscada_numeros.length > 0
-          ? primero.boleta_buscada_numeros.map(Number)
-          : [num]
-      )
-
-      // Mismo flujo que búsqueda por cliente: mostrar todas las ventas del cliente.
-      // Si hay un solo cliente en los resultados, ir directo a su lista de ventas.
-      const clientesUnicos = new Map<string, ResultadoBusquedaBoleta>()
-      for (const r of data.resultados) {
-        if (r.cliente?.id) clientesUnicos.set(r.cliente.id, r)
-      }
-
-      if (clientesUnicos.size === 1) {
-        const resultado = data.resultados[0]
-        setClienteDeBoleta({
-          id: resultado.cliente.id,
-          nombre: resultado.cliente.nombre,
-          telefono: resultado.cliente.telefono,
-          email: resultado.cliente.email,
-          identificacion: resultado.cliente.identificacion,
-          direccion: resultado.cliente.direccion,
-        })
-        setVentaConBoletaId(resultado.venta_id)
-      }
-      // Si hay varios clientes (misma boleta en distintas rifas), se muestra selector abajo.
-    } catch (err: any) {
-      setErrorBusqueda(err.message || 'Error buscando boleta')
-    } finally {
-      setBuscando(false)
-    }
+    await buscarPorNumeroBoleta(num)
   }
+
+  useEffect(() => {
+    if (autoBusquedaEjecutada.current) return
+    if (searchParams.get('auto') !== '1') return
+    const numeroParam = searchParams.get('numero')
+    if (!numeroParam) return
+
+    const num = parseInt(sanitizeBoletaSearchDigits(numeroParam).replace(/^0+/, '') || numeroParam, 10)
+    if (isNaN(num) || num <= 0) return
+
+    autoBusquedaEjecutada.current = true
+    setModoBusqueda('boleta')
+    setNumeroBoleta(String(num))
+    const rifaId = searchParams.get('rifa_id') || undefined
+    const ventaId = searchParams.get('venta_id')
+    void buscarPorNumeroBoleta(num, { rifaId, ventaIdPreferida: ventaId })
+  }, [searchParams, buscarPorNumeroBoleta])
 
   const resetBusqueda = () => {
     setNumeroBoleta('')
@@ -279,10 +326,10 @@ export default function GestionarAbonosPage() {
         {clienteActivo && (
           <div className="space-y-6">
             {boletaBuscadaNum != null && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">🎫</span>
-                  <div>
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <span className="text-2xl shrink-0">🎫</span>
+                  <div className="min-w-0">
                     <p className="text-sm text-blue-700">
                       Boleta {formatBoletaNumeros(boletaBuscadaNumeros, boletaBuscadaNum)} encontrada
                       {resultadosBoleta?.[0]?.rifa_nombre && (
@@ -295,21 +342,22 @@ export default function GestionarAbonosPage() {
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={resetBusqueda}
-                  className="px-3 py-1.5 text-sm border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-100"
+                  className="w-full sm:w-auto shrink-0 px-3 py-2 text-sm border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-100 min-h-[44px]"
                 >
                   Nueva búsqueda
                 </button>
               </div>
             )}
 
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 sm:p-6 overflow-hidden">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
                     <span className="text-xl">{clienteDeBoleta ? '🎫' : '👤'}</span>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <h2 className="text-lg font-semibold text-slate-900">{clienteActivo.nombre}</h2>
                     <p className="text-sm text-slate-600">{clienteActivo.telefono}</p>
                     {clienteActivo.identificacion && (
@@ -321,8 +369,9 @@ export default function GestionarAbonosPage() {
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={resetBusqueda}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
+                  className="w-full sm:w-auto shrink-0 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 min-h-[44px]"
                 >
                   Cambiar
                 </button>
@@ -343,5 +392,19 @@ export default function GestionarAbonosPage() {
         )}
       </main>
     </div>
+  )
+}
+
+export default function GestionarAbonosPageRoute() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-600">
+          Cargando gestión de abonos…
+        </div>
+      }
+    >
+      <GestionarAbonosPage />
+    </Suspense>
   )
 }

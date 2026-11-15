@@ -90,12 +90,18 @@ async function waitForImages(el: HTMLElement, timeoutMs = 10000): Promise<void> 
   )
 }
 
-async function triggerFileDownload(blob: Blob, fileName: string): Promise<boolean> {
+export type BoletaImageDelivery = 'save' | 'share'
+
+async function triggerFileDownload(
+  blob: Blob,
+  fileName: string,
+  delivery: BoletaImageDelivery = 'save'
+): Promise<boolean> {
   const file = new File([blob], fileName, { type: 'image/png' })
 
-  // Web Share API solo en móvil. En PC abre "Compartir" y no descarga el archivo.
+  // share: hoja del sistema (p. ej. WhatsApp). save: descarga directa sin compartir.
   if (
-    isMobileDevice() &&
+    delivery === 'share' &&
     typeof navigator !== 'undefined' &&
     navigator.share &&
     navigator.canShare?.({ files: [file] })
@@ -168,7 +174,8 @@ export async function captureBoletaTicket(
 export async function downloadBoletaFromElement(
   ticket: HTMLElement,
   fileName: string,
-  scale?: number
+  scale?: number,
+  delivery: BoletaImageDelivery = 'save'
 ): Promise<boolean> {
   const canvas = await captureBoletaTicket(ticket, scale)
   if (!canvas) return false
@@ -179,7 +186,7 @@ export async function downloadBoletaFromElement(
   if (!blob) return false
 
   const name = fileName.endsWith('.png') ? fileName : `${fileName}.png`
-  return triggerFileDownload(blob, name)
+  return triggerFileDownload(blob, name, delivery)
 }
 
 export async function downloadBoletaImage(options: {
@@ -188,8 +195,15 @@ export async function downloadBoletaImage(options: {
   selector?: string
   fileName: string
   scale?: number
+  /** save = galería/archivo directo; share = hoja del SO (WhatsApp, etc.) */
+  delivery?: BoletaImageDelivery
 }): Promise<boolean> {
   const ticket = resolveTicketElement(options)
   if (!ticket) return false
-  return downloadBoletaFromElement(ticket, options.fileName, options.scale)
+  return downloadBoletaFromElement(
+    ticket,
+    options.fileName,
+    options.scale,
+    options.delivery ?? 'save'
+  )
 }

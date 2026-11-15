@@ -240,12 +240,12 @@ export default function MethodsChart({
             <div>
               <h3 className="text-sm font-semibold text-slate-800">Canal vendedores</h3>
               <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
-                Abonos que registró el vendedor en calle (no Nequi/PSE de oficina)
+                Solo montos entregados registrados en Cuentas y entregas (liquidación)
               </p>
             </div>
             <div className="text-right">
               <p className="text-xl font-bold text-cyan-900">${totalVendedores.toLocaleString('es-CO')}</p>
-              <p className="text-xs text-slate-400">{txVendedores} transacciones</p>
+              <p className="text-xs text-slate-400">{txVendedores} liquidación(es)</p>
             </div>
           </div>
           <MethodCard
@@ -256,9 +256,9 @@ export default function MethodsChart({
           />
           {selectedVendedor && vendedoresLiquidaciones != null && Number(vendedoresLiquidaciones) >= 0 && (
             <p className="text-[10px] sm:text-xs text-cyan-800/90 bg-cyan-50 border border-cyan-100 rounded-lg px-3 py-2">
-              Liquidaciones registradas al panel:{' '}
+              Total liquidado (cuentas y entregas):{' '}
               <strong>${Number(vendedoresLiquidaciones).toLocaleString('es-CO')}</strong>
-              {' '}· entra al recaudo global cuando se registra la entrega
+              {' '}· no incluye cobros en calle hasta que se registre la entrega
             </p>
           )}
         </div>

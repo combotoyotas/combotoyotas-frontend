@@ -6,6 +6,15 @@ import { rifaApi } from '@/lib/rifaApi'
 import { boletaApi } from '@/lib/boletaApi'
 import { Rifa } from '@/types/rifa'
 import BoletaCuadricula, { CuadriculaBoleta } from '@/components/BoletaCuadricula'
+import OfflineBoletasBanner from '@/components/boletas/OfflineBoletasBanner'
+import {
+  getVendorUserIdFromStorage,
+  isNetworkUnavailableError,
+  loadVendorCuadriculaOffline,
+  loadVendorRifasOffline,
+  saveVendorCuadriculaOffline,
+  saveVendorRifasOffline,
+} from '@/lib/boletasOfflineStore'
 
 export default function BoletasCuadriculaPage() {
   const router = useRouter()
@@ -19,6 +28,9 @@ export default function BoletasCuadriculaPage() {
   const [error, setError] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [offlineMode, setOfflineMode] = useState(false)
+  const [offlineSavedAt, setOfflineSavedAt] = useState<number | null>(null)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -36,6 +48,7 @@ export default function BoletasCuadriculaPage() {
       }
       setUserRole(rol)
       setUserName(user.nombre || null)
+      setUserId(user.id ? String(user.id) : null)
       loadRifas()
     } catch {
       router.push('/login')
@@ -54,13 +67,42 @@ export default function BoletasCuadriculaPage() {
     }
   }, [selectedRifa])
 
+  const isVendedor = userRole === 'VENDEDOR'
+
+  useEffect(() => {
+    if (!isVendedor || !userId) return
+    const syncOnline = () => {
+      if (!navigator.onLine) return
+      loadRifas()
+      if (selectedRifa) loadCuadricula(selectedRifa)
+    }
+    window.addEventListener('online', syncOnline)
+    return () => window.removeEventListener('online', syncOnline)
+  }, [isVendedor, userId, selectedRifa])
+
   const loadRifas = async () => {
     try {
       setLoading(true)
       const response = await rifaApi.getRifasOperativas()
       setRifas(response.data)
       setError(null)
+      setOfflineMode(false)
+      const vendorId = getVendorUserIdFromStorage()
+      if (vendorId) {
+        await saveVendorRifasOffline(vendorId, response.data)
+      }
     } catch (err) {
+      const vendorId = getVendorUserIdFromStorage()
+      if (vendorId && isNetworkUnavailableError(err)) {
+        const cached = await loadVendorRifasOffline(vendorId)
+        if (cached?.data?.length) {
+          setRifas(cached.data)
+          setOfflineMode(true)
+          setOfflineSavedAt(cached.savedAt)
+          setError(null)
+          return
+        }
+      }
       setError(err instanceof Error ? err.message : 'Error al cargar proyectos')
     } finally {
       setLoading(false)
@@ -73,14 +115,44 @@ export default function BoletasCuadriculaPage() {
       const response = await boletaApi.getBoletasCuadricula(rifaId)
       setBoletas(response.data.boletas)
       setAlcance(response.data.alcance)
-      setRifaNombre(response.data.rifa?.nombre || rifas.find((r) => r.id === rifaId)?.nombre)
+      const nombre =
+        response.data.rifa?.nombre || rifas.find((r) => r.id === rifaId)?.nombre
+      setRifaNombre(nombre)
       setError(null)
+      const vendorId = getVendorUserIdFromStorage()
+      if (vendorId) {
+        await saveVendorCuadriculaOffline(vendorId, rifaId, {
+          boletas: response.data.boletas,
+          alcance: response.data.alcance,
+          rifaNombre: nombre,
+        })
+        if (!offlineMode) setOfflineSavedAt(Date.now())
+      }
+      if (navigator.onLine) setOfflineMode(false)
     } catch (err) {
+      const vendorId = getVendorUserIdFromStorage()
+      if (vendorId && isNetworkUnavailableError(err)) {
+        const cached = await loadVendorCuadriculaOffline(vendorId, rifaId)
+        if (cached?.data) {
+          setBoletas(cached.data.boletas)
+          setAlcance(cached.data.alcance)
+          setRifaNombre(cached.data.rifaNombre)
+          setOfflineMode(true)
+          setOfflineSavedAt(cached.savedAt)
+          setError(null)
+          return
+        }
+      }
       setError(err instanceof Error ? err.message : 'Error al cargar cuadrícula')
       setBoletas([])
     } finally {
       setLoadingGrid(false)
     }
+  }
+
+  const reintentarConexion = async () => {
+    await loadRifas()
+    if (selectedRifa) await loadCuadricula(selectedRifa)
   }
 
   if (!userRole) {
@@ -119,6 +191,15 @@ export default function BoletasCuadriculaPage() {
       </header>
 
       <main className="flex-1 min-h-0 flex flex-col w-full max-w-5xl mx-auto px-1.5 sm:px-3 py-0.5 lg:py-2">
+        {isVendedor && offlineMode && (
+          <div className="shrink-0 mb-1">
+            <OfflineBoletasBanner
+              savedAt={offlineSavedAt}
+              onRetry={reintentarConexion}
+              retrying={loading || loadingGrid}
+            />
+          </div>
+        )}
         <div className="shrink-0 flex items-center gap-1.5 mb-0.5">
           <button
             type="button"
@@ -164,6 +245,7 @@ export default function BoletasCuadriculaPage() {
             alcance={alcance}
             vendedorNombre={userRole === 'VENDEDOR' ? userName : null}
             loading={loading || loadingGrid}
+            readOnly={isVendedor && offlineMode}
           />
         </div>
       </main>

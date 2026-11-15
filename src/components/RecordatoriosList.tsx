@@ -2,11 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { recordatoriosApi, ClienteRecordatorio, ResumenRecordatorios, Vendedor } from '@/lib/recordatoriosApi'
-import { clienteApi } from '@/lib/clienteApi'
-import { RifaConBoletas } from '@/types/cliente'
-import { normalizarTelefono } from '@/utils/telefono'
-import { mensajeRecordatorioPendiente } from '@/utils/whatsappMensajes'
-import { formatBoletaNumeros } from '@/utils/formatBoletaNumeros'
+import { generarWhatsappClienteRecordatorio } from '@/lib/clienteRecordatorioWhatsapp'
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-CO', {
@@ -34,39 +30,6 @@ function formatDateShort(dateString: string) {
     month: 'short',
     day: 'numeric',
   })
-}
-
-/**
- * Genera = URL de WhatsApp con un mensaje bonito personalizado
- */
-async function generarMensajeWhatsApp(
-  cliente: ClienteRecordatorio,
-  tipo: 'todos' | 'reservadas' | 'abonadas' = 'todos'
-): Promise<string | null> {
-  const telCompleto = normalizarTelefono(cliente.telefono)
-  if (!telCompleto || telCompleto.length < 7) return null
-
-  const nombre = cliente.nombre || 'Cliente'
-
-  try {
-    const response = await clienteApi.getClienteDetalle(cliente.id)
-    const { rifas } = response.data
-
-    const pachas: string[] = []
-    rifas.forEach((rifa: RifaConBoletas) => {
-      const boletasPendientes = rifa.boletas.filter(b => b.estado === 'RESERVADA' || b.estado === 'ABONADA')
-      boletasPendientes.forEach(b => {
-        pachas.push(formatBoletaNumeros(b.numeros, b.numero))
-      })
-    })
-
-    const msg = mensajeRecordatorioPendiente({ nombre, pachas })
-
-    return `https://wa.me/${telCompleto}?text=${encodeURIComponent(msg)}`
-  } catch {
-    const msg = mensajeRecordatorioPendiente({ nombre, pachas: [] })
-    return `https://wa.me/${telCompleto}?text=${encodeURIComponent(msg)}`
-  }
 }
 
 // Detectar vendedor logueado de forma sincrónica para evitar race conditions
@@ -134,7 +97,12 @@ export default function RecordatoriosList() {
   const handleEnviarRecordatorio = async (cliente: ClienteRecordatorio) => {
     setCargandoRecordatorio(cliente.id)
     try {
-      const url = await generarMensajeWhatsApp(cliente, filtroActivo)
+      const url = await generarWhatsappClienteRecordatorio({
+        clienteId: cliente.id,
+        nombre: cliente.nombre,
+        telefono: cliente.telefono,
+        deuda_total: cliente.deuda_total,
+      })
       if (url) {
         window.open(url, '_blank')
         // Registrar la notificación

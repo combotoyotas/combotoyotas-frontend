@@ -91,6 +91,20 @@ export const ajustesApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  getWhatsappPlantillaCliente: () =>
+    request<{ plantilla: string }>('/whatsapp-plantilla-cliente'),
+  getGlobalWhatsappPlantillaCliente: () =>
+    request<{ plantilla: string }>('/global/whatsapp-plantilla-cliente'),
+  saveGlobalWhatsappPlantillaCliente: (body: { plantilla?: string }) =>
+    request<{ plantilla: string }>('/global/whatsapp-plantilla-cliente', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  saveVendedorWhatsappPlantillaCliente: (body: { plantilla?: string }) =>
+    request<{ plantilla: string }>('/mios/whatsapp-plantilla-cliente', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   saveComisionVendedores: (body: {
     comision_vendedores_pct?: number
     comision_vendedores_pagada_pct?: number
