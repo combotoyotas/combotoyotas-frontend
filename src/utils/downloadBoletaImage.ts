@@ -6,9 +6,14 @@ import {
 export { BOLETA_WIDTH, BOLETA_DEFAULT_HEIGHT }
 export { BOLETA_DEFAULT_HEIGHT as BOLETA_HEIGHT }
 
-function isMobileDevice(): boolean {
+export function isMobileDevice(): boolean {
   if (typeof navigator === 'undefined') return false
   return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+}
+
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent)
 }
 
 function exportScale(custom?: number): number {
@@ -92,30 +97,44 @@ async function waitForImages(el: HTMLElement, timeoutMs = 10000): Promise<void> 
 
 export type BoletaImageDelivery = 'save' | 'share'
 
+async function tryShareImageFile(file: File, title: string): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !navigator.share) return false
+  if (!navigator.canShare?.({ files: [file] })) return false
+  try {
+    await navigator.share({ files: [file], title })
+    return true
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') return false
+    return false
+  }
+}
+
+/** En móvil, la hoja de compartir permite «Guardar imagen» en galería (iOS/Android). */
 async function triggerFileDownload(
   blob: Blob,
   fileName: string,
   delivery: BoletaImageDelivery = 'save'
 ): Promise<boolean> {
-  const file = new File([blob], fileName, { type: 'image/png' })
+  const mime = blob.type || 'image/jpeg'
+  const file = new File([blob], fileName, { type: mime })
+  const mobile = isMobileDevice()
 
-  // share: hoja del sistema (p. ej. WhatsApp). save: descarga directa sin compartir.
-  if (
-    delivery === 'share' &&
-    typeof navigator !== 'undefined' &&
-    navigator.share &&
-    navigator.canShare?.({ files: [file] })
-  ) {
-    try {
-      await navigator.share({ files: [file], title: fileName })
-      return true
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') return false
-      // Si falla share, continuar con descarga directa abajo
-    }
+  if (delivery === 'share' || (delivery === 'save' && mobile)) {
+    const shared = await tryShareImageFile(file, fileName.replace(/\.(jpe?g|png)$/i, ''))
+    if (shared) return true
   }
 
   const url = URL.createObjectURL(blob)
+
+  // iOS: el atributo download no guarda en Fotos; abrir la imagen para «mantener» / compartir.
+  if (isIOS() && delivery === 'save') {
+    const opened = window.open(url, '_blank', 'noopener,noreferrer')
+    if (opened) {
+      setTimeout(() => URL.revokeObjectURL(url), 120000)
+      return true
+    }
+  }
+
   try {
     const link = document.createElement('a')
     link.href = url
@@ -180,12 +199,14 @@ export async function downloadBoletaFromElement(
   const canvas = await captureBoletaTicket(ticket, scale)
   if (!canvas) return false
 
+  const useJpeg = delivery === 'save' || delivery === 'share'
   const blob = await new Promise<Blob | null>((resolve) => {
-    canvas.toBlob((b) => resolve(b), 'image/png')
+    canvas.toBlob((b) => resolve(b), useJpeg ? 'image/jpeg' : 'image/png', 0.92)
   })
   if (!blob) return false
 
-  const name = fileName.endsWith('.png') ? fileName : `${fileName}.png`
+  const base = fileName.replace(/\.(png|jpe?g)$/i, '')
+  const name = useJpeg ? `${base}.jpg` : `${base}.png`
   return triggerFileDownload(blob, name, delivery)
 }
 

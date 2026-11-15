@@ -1,16 +1,19 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { boletaApi } from '@/lib/boletaApi'
 import BoletaTicket from '@/components/BoletaTicket'
 import ResponsiveBoletaWrapper from '@/components/ResponsiveBoletaWrapper'
-import { downloadBoletaImage } from '@/utils/downloadBoletaImage'
+import { downloadBoletaImage, isMobileDevice } from '@/utils/downloadBoletaImage'
+import { getModuleLastPath } from '@/lib/moduleLastPath'
 import type { BoletaDetail } from '@/types/boleta'
 
 export default function BoletaPrintPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const soloFoto = searchParams.get('foto') === '1'
   const [boleta, setBoleta] = useState<BoletaDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -29,7 +32,8 @@ export default function BoletaPrintPage() {
     try {
       await downloadBoletaImage({
         selector: '.print-boleta-container .boleta-ticket',
-        fileName: `${buildFilename(boleta)}.png`,
+        fileName: buildFilename(boleta),
+        delivery: 'save',
       })
     } catch (err) {
       console.error('Error al descargar imagen:', err)
@@ -82,14 +86,25 @@ export default function BoletaPrintPage() {
     }
   }, [boleta, buildFilename])
 
-  useEffect(() => {
-    if (boleta) {
-      // Auto-print when page loads
-      setTimeout(() => {
-        handlePrint()
-      }, 1000)
+  const volver = useCallback(() => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back()
+      return
     }
-  }, [boleta])
+    router.push(getModuleLastPath('boletas', '/boletas/ver'))
+  }, [router])
+
+  useEffect(() => {
+    if (!boleta) return
+    if (soloFoto || isMobileDevice()) {
+      const t = setTimeout(() => {
+        void handleDownloadImage()
+      }, 600)
+      return () => clearTimeout(t)
+    }
+    const t = setTimeout(() => handlePrint(), 1000)
+    return () => clearTimeout(t)
+  }, [boleta, soloFoto, handleDownloadImage, handlePrint])
 
   if (loading) {
     return (
@@ -106,10 +121,11 @@ export default function BoletaPrintPage() {
           <h2 className="text-lg font-medium mb-2">Error</h2>
           <p>{error || 'No se encontró la boleta'}</p>
           <button
-            onClick={() => window.close()}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            type="button"
+            onClick={() => volver()}
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 min-h-[44px]"
           >
-            Cerrar
+            Volver
           </button>
         </div>
       </div>
@@ -117,9 +133,18 @@ export default function BoletaPrintPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
+    <div className="min-h-screen bg-gray-100 p-4 sm:p-8 pb-28 lg:pb-8">
+      <div className="no-print mb-4 lg:hidden">
+        <button
+          type="button"
+          onClick={volver}
+          className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 min-h-[44px]"
+        >
+          ← Volver a boletas
+        </button>
+      </div>
       {/* Print Controls - Hidden when printing */}
-      <div className="no-print mb-6 flex justify-center space-x-4">
+      <div className="no-print mb-6 flex flex-wrap justify-center gap-3">
         <button
           onClick={handlePrint}
           className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
@@ -137,13 +162,14 @@ export default function BoletaPrintPage() {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          {downloading ? 'Descargando...' : 'Descargar Imagen'}
+          {downloading ? 'Guardando…' : 'Descargar foto'}
         </button>
         <button
-          onClick={() => window.close()}
-          className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+          type="button"
+          onClick={volver}
+          className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors min-h-[44px]"
         >
-          Cerrar
+          Volver
         </button>
       </div>
 

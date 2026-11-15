@@ -1345,7 +1345,9 @@ export default function BoletaList({
           rifaInfo={rifaInfo}
           estadoInfo={getEstadoInfo(menuBoleta)}
           onVerDetalle={() => router.push(`/boletas/${menuBoleta.id}`)}
-          onImprimir={() => router.push(`/boletas/${menuBoleta.id}/print`)}
+          onImprimir={() =>
+            router.push(`/boletas/${menuBoleta.id}/print?foto=1`)
+          }
           onEditarNota={() => handleEditNota(menuBoleta)}
           rifaId={rifaInfo?.id ?? null}
           onIrAVender={(href) => router.push(href)}

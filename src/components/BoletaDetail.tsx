@@ -10,6 +10,7 @@ import { formatRegistradoConRol } from '@/utils/formatAbonoRegistradoPor'
 import type { BoletaDetail } from '@/types/boleta'
 import type { Rifa } from '@/types/rifa'
 import { getBoletaEstadoMenuInfo } from '@/utils/boletaEstadoMenu'
+import { boletaDetailTicketElementId } from '@/lib/boletaDescargarDesdeDetalle'
 
 interface BoletaDetailProps {
   boleta: BoletaDetail
@@ -97,7 +98,10 @@ export default function BoletaDetail({ boleta, onPrint, onBoletaUpdated }: Bolet
           />
         </div>
 
-        <div className="-mx-1 sm:mx-0 overflow-x-hidden">
+        <div
+          id={boletaDetailTicketElementId(boleta.id)}
+          className="-mx-1 sm:mx-0 overflow-x-hidden"
+        >
         <ResponsiveBoletaWrapper>
           <BoletaTicket
             qrUrl={boleta.qr_url}

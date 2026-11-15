@@ -186,15 +186,11 @@ export function shouldShowSidebar(pathname: string): boolean {
   if (pathname.startsWith('/verificar') || pathname.startsWith('/mis-boletas')) {
     return false
   }
-  if (pathname.endsWith('/print')) {
-    return false
-  }
   return true
 }
 
 export function shouldShowTabBar(pathname: string): boolean {
   if (pathname === '/login' || pathname === '/') return false
   if (pathname.startsWith('/verificar') || pathname.startsWith('/mis-boletas')) return false
-  if (pathname.endsWith('/print')) return false
   return true
 }

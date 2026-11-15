@@ -1,12 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { boletaApi } from '@/lib/boletaApi'
 import type { BoletaDetail } from '@/types/boleta'
 import BoletaDetailComponent from '@/components/BoletaDetail'
 import { formatBoletaNumeros } from '@/utils/formatBoletaNumeros'
 import { boletaEstadoDisplay } from '@/utils/boletaEstadoDisplay'
+import { getModuleLastPath } from '@/lib/moduleLastPath'
+import { descargarBoletaDetalleComoFoto } from '@/lib/boletaDescargarDesdeDetalle'
+import { isMobileDevice } from '@/utils/downloadBoletaImage'
 
 export default function BoletaDetailPage() {
   const params = useParams()
@@ -15,11 +18,20 @@ export default function BoletaDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [descargandoFoto, setDescargandoFoto] = useState(false)
+
+  const volverALista = useCallback(() => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back()
+      return
+    }
+    router.push(getModuleLastPath('boletas', '/boletas/ver'))
+  }, [router])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
     const userData = localStorage.getItem('user')
-    
+
     if (!token || !userData) {
       router.push('/login')
       return
@@ -28,9 +40,8 @@ export default function BoletaDetailPage() {
     try {
       const user = JSON.parse(userData)
       setUserRole(user.rol)
-      
       fetchBoletaDetail()
-    } catch (error) {
+    } catch {
       router.push('/login')
     }
   }, [router])
@@ -39,7 +50,7 @@ export default function BoletaDetailPage() {
     try {
       setLoading(true)
       const boletaId = params.id as string
-      
+
       if (!boletaId) {
         setError('ID de boleta no proporcionado')
         return
@@ -55,21 +66,42 @@ export default function BoletaDetailPage() {
     }
   }
 
-  const handlePrint = () => {
-    if (boleta) {
-      router.push(`/boletas/${boleta.id}/print`)
+  const handleDescargarFoto = useCallback(async () => {
+    if (!boleta) return
+    setDescargandoFoto(true)
+    try {
+      await descargarBoletaDetalleComoFoto(
+        boleta.id,
+        boleta.numero,
+        boleta.cliente_info?.identificacion
+      )
+    } catch (err) {
+      console.error(err)
+      window.alert('No se pudo guardar la imagen de la boleta')
+    } finally {
+      setDescargandoFoto(false)
     }
-  }
+  }, [boleta])
+
+  const handlePrint = useCallback(() => {
+    if (!boleta) return
+    if (isMobileDevice()) {
+      void handleDescargarFoto()
+      return
+    }
+    router.push(`/boletas/${boleta.id}/print`)
+  }, [boleta, handleDescargarFoto, router])
 
   if (userRole && userRole !== 'SUPER_ADMIN' && userRole !== 'VENDEDOR' && userRole !== 'ADMIN') {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-[50vh] flex items-center justify-center px-4">
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-6 py-4 rounded-lg max-w-md">
           <h2 className="text-lg font-medium mb-2">Acceso Restringido</h2>
           <p>Este módulo solo está disponible para usuarios con rol SUPER_ADMIN, VENDEDOR o ADMIN</p>
           <button
+            type="button"
             onClick={() => router.push('/dashboard')}
-            className="mt-4 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800"
+            className="mt-4 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 min-h-[44px]"
           >
             Volver al Dashboard
           </button>
@@ -80,30 +112,32 @@ export default function BoletaDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-slate-500">Cargando detalles de la boleta...</div>
+      <div className="min-h-[40vh] flex items-center justify-center text-slate-500">
+        Cargando detalles de la boleta…
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg max-w-md">
+      <div className="px-4 py-8 max-w-md mx-auto">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg">
           <h2 className="text-lg font-medium mb-2">Error</h2>
           <p>{error}</p>
-          <div className="mt-4 space-x-4">
+          <div className="mt-4 flex flex-wrap gap-2">
             <button
+              type="button"
               onClick={fetchBoletaDetail}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 min-h-[44px]"
             >
               Reintentar
             </button>
             <button
-              onClick={() => router.push('/boletas')}
-              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
+              type="button"
+              onClick={volverALista}
+              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 min-h-[44px]"
             >
-              Volver a Boletas
+              Volver a boletas
             </button>
           </div>
         </div>
@@ -113,15 +147,15 @@ export default function BoletaDetailPage() {
 
   if (!boleta) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-6 py-4 rounded-lg max-w-md">
-          <h2 className="text-lg font-medium mb-2">Boleta No Encontrada</h2>
-          <p>No se encontró la boleta solicitada</p>
+      <div className="px-4 py-8 max-w-md mx-auto">
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-6 py-4 rounded-lg">
+          <h2 className="text-lg font-medium mb-2">Boleta no encontrada</h2>
           <button
-            onClick={() => router.push('/boletas')}
-            className="mt-4 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800"
+            type="button"
+            onClick={volverALista}
+            className="mt-4 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 min-h-[44px]"
           >
-            Volver a Boletas
+            Volver a boletas
           </button>
         </div>
       </div>
@@ -132,55 +166,40 @@ export default function BoletaDetailPage() {
   const estadoUi = boletaEstadoDisplay(boleta.estado)
 
   return (
-    <div className="app-shell pb-4 lg:pb-0">
-      <header className="app-header sticky top-0 z-30 hidden lg:block">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16 gap-4">
-            <div className="flex items-center gap-4 min-w-0">
-              <button
-                type="button"
-                onClick={() => router.push('/boletas/ver')}
-                className="text-slate-600 hover:text-slate-900 transition-colors shrink-0"
-              >
-                ← Boletas
-              </button>
-              <h1 className="text-xl font-semibold text-neutral-100 truncate">Detalles de Boleta</h1>
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <span className="text-sm text-slate-300 font-mono">#{numeroLabel}</span>
-              <span className={`inline-flex px-2.5 py-1 text-xs font-semibold rounded-full ${estadoUi.badgeClass}`}>
-                {estadoUi.label.toUpperCase()}
-              </span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-8">
-        <div className="lg:hidden mb-4">
+    <div className="pb-28 lg:pb-6">
+      <div
+        className="sticky z-20 -mx-3 sm:mx-0 mb-3 sm:mb-4 border-b border-slate-200 bg-white/95 backdrop-blur-md px-3 sm:px-0 py-2 lg:static lg:border-0 lg:bg-transparent lg:backdrop-blur-none"
+        style={{ top: 'calc(3.5rem + var(--sat, 0px))' }}
+      >
+        <div className="flex items-center gap-2 min-h-[44px]">
           <button
             type="button"
-            onClick={() => router.push('/boletas/ver')}
-            className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 min-h-[44px] -ml-1 px-1"
+            onClick={volverALista}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 min-h-[44px] px-2 -ml-2 rounded-lg hover:bg-indigo-50"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Boletas
+            Volver
           </button>
-          <div className="flex flex-wrap items-center gap-2 mt-1">
-            <h1 className="text-lg font-bold text-slate-900 leading-snug">Detalle de boleta</h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <span className="font-mono text-sm font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-lg">
-              #{numeroLabel}
-            </span>
-            <span className={`inline-flex px-2.5 py-1 text-xs font-bold rounded-full ${estadoUi.badgeClass}`}>
-              {estadoUi.label.toUpperCase()}
-            </span>
-          </div>
+          <span className="hidden sm:inline text-slate-300">|</span>
+          <h1 className="text-base sm:text-xl font-bold text-slate-900 truncate flex-1 min-w-0">
+            Boleta #{numeroLabel}
+          </h1>
+          <span
+            className={`shrink-0 inline-flex px-2.5 py-1 text-xs font-bold rounded-full ${estadoUi.badgeClass}`}
+          >
+            {estadoUi.label.toUpperCase()}
+          </span>
         </div>
+      </div>
 
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        {descargandoFoto && (
+          <p className="text-sm text-indigo-600 font-medium mb-2" role="status">
+            Guardando imagen…
+          </p>
+        )}
         <BoletaDetailComponent boleta={boleta} onPrint={handlePrint} onBoletaUpdated={fetchBoletaDetail} />
       </main>
     </div>
