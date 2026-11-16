@@ -147,6 +147,8 @@ export default function BoletasReservadasPage() {
     return [Number(b.numero)]
   }
 
+  const boletaLiberable = (b: BoletaReservada) => b.puede_liberar !== false
+
   // Filtrar boletas — 4 cifras = exacto; 1–3 = prefijo; cualquier número del par
   const boletasFiltradas = boletas.filter(b => {
     const term = searchTerm.trim()
@@ -249,8 +251,6 @@ export default function BoletasReservadasPage() {
       : userRol === 'SUPER_ADMIN'
         ? 'Ves todas las boletas reservadas del sistema.'
         : null
-
-  const boletaLiberable = (b: BoletaReservada) => b.puede_liberar !== false
 
   // Resumen
   const totalReservadas = boletas.length
