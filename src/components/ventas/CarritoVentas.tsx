@@ -245,6 +245,7 @@ export default function CarritoVentas({
       const ventaData: VentaRequest = {
         rifa_id: rifaId,
         cliente: {
+          ...(cliente.id ? { id: cliente.id } : {}),
           nombre: cliente.nombre,
           telefono: cliente.telefono,
           email: cliente.email,

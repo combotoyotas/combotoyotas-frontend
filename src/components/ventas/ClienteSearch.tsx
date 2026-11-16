@@ -200,7 +200,7 @@ export default function ClienteSearch({
         identificacion: idTrim || undefined,
       }
       const response = await ventasApi.crearCliente(payload)
-      const nuevoCliente = response.data?.cliente ?? response.data
+      const nuevoCliente = (response as { data: Cliente }).data
       
       console.log('Cliente creado exitosamente:', nuevoCliente)
       
@@ -235,6 +235,21 @@ export default function ClienteSearch({
       
     } catch (error: any) {
       console.error('Error creando cliente:', error)
+      if (idTrim && (error.code === 'DUPLICATE_IDENTIFICATION' || /cédula/i.test(error.message || ''))) {
+        try {
+          const found = await ventasApi.buscarClientePorCedula(idTrim)
+          const existente = found.data as Cliente
+          if (existente?.id) {
+            onClienteSelected(existente)
+            setClienteCreadoExitosamente(true)
+            setClienteNuevo({ nombre: '', telefono: '', email: '', direccion: '', identificacion: '' })
+            setError(null)
+            return
+          }
+        } catch {
+          /* seguir con mensaje de error */
+        }
+      }
       setError(error.message || 'Error creando cliente')
     } finally {
       setCreando(false)

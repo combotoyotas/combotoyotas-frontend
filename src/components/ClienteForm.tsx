@@ -11,7 +11,7 @@ interface ClienteFormProps {
 }
 
 export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteFormProps) {
-  const [formData, setFormData] = useState<ClienteCreateRequest>({
+  const [formData, setFormData] = useState({
     nombre: '',
     telefono: '',
     email: '',
@@ -21,18 +21,33 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [generandoId, setGenerandoId] = useState(false)
+  const [esVendedor, setEsVendedor] = useState(false)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('user')
+      if (!raw) return
+      const user = JSON.parse(raw)
+      setEsVendedor(String(user?.rol || '').toUpperCase() === 'VENDEDOR')
+    } catch {
+      setEsVendedor(false)
+    }
+  }, [])
 
   useEffect(() => {
     if (cliente) {
       setFormData({
-        nombre: cliente.nombre,
-        telefono: cliente.telefono,
-        email: cliente.email,
-        identificacion: cliente.identificacion,
-        direccion: cliente.direccion
+        nombre: cliente.nombre || '',
+        telefono: cliente.telefono || '',
+        email: cliente.email || '',
+        identificacion: cliente.identificacion || '',
+        direccion: cliente.direccion || ''
       })
     }
   }, [cliente])
+
+  const isEdit = Boolean(cliente)
+  const identificacionRequeridaEnAlta = !isEdit && !esVendedor
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -60,14 +75,14 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
       if (errors.identificacion) {
         setErrors(prev => ({ ...prev, identificacion: '' }))
       }
-    } catch (error) {
+    } catch {
       setErrors(prev => ({ ...prev, identificacion: 'Error al generar identificación' }))
     } finally {
       setGenerandoId(false)
     }
   }
 
-  const validateForm = async () => {
+  const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
     if (!formData.nombre.trim()) {
@@ -79,31 +94,38 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
     if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'El email no es válido'
     }
-    if (!formData.identificacion.trim()) {
+    if (identificacionRequeridaEnAlta && !formData.identificacion.trim()) {
       newErrors.identificacion = 'La identificación es requerida'
     }
-    if (!formData.direccion.trim()) {
-      newErrors.direccion = 'La dirección es requerida'
+    if (formData.identificacion.trim() && formData.identificacion.trim().length < 5) {
+      newErrors.identificacion = 'Mínimo 5 caracteres si ingresas identificación'
     }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
+  const buildPayload = () => {
+    const base = {
+      nombre: formData.nombre.trim(),
+      telefono: formData.telefono.trim(),
+      email: formData.email.trim() || (isEdit ? null : undefined),
+      identificacion: formData.identificacion.trim() || (isEdit ? null : undefined),
+      direccion: formData.direccion.trim() || (isEdit ? null : undefined),
+    }
+    return base
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!(await validateForm())) {
+    if (!validateForm()) {
       return
     }
 
     setLoading(true)
     try {
-      await onSubmit({
-        ...formData,
-        email: formData.email.trim() || undefined,
-        direccion: formData.direccion.trim() || undefined,
-      })
+      await onSubmit(buildPayload() as ClienteCreateRequest | ClienteUpdateRequest)
     } finally {
       setLoading(false)
     }
@@ -123,6 +145,7 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
           )}
         </div>
         <button
+          type="button"
           onClick={onCancel}
           className="text-slate-400 hover:text-slate-600 transition-colors"
         >
@@ -194,7 +217,10 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
 
           <div>
             <label htmlFor="identificacion" className="block text-sm font-bold text-black mb-2">
-              Identificación *
+              Identificación
+              {identificacionRequeridaEnAlta ? ' *' : (
+                <span className="font-normal text-slate-500"> (opcional)</span>
+              )}
             </label>
             <div className="flex gap-2">
               <input
@@ -206,7 +232,7 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
                 className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition-all duration-200 text-slate-900 placeholder-slate-400 ${
                   errors.identificacion ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white'
                 }`}
-                placeholder="12345678901"
+                placeholder={identificacionRequeridaEnAlta ? '1234567890' : 'Opcional'}
               />
               {!cliente && (
                 <button
@@ -232,7 +258,7 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
 
         <div>
           <label htmlFor="direccion" className="block text-sm font-bold text-black mb-2">
-            Dirección *
+            Dirección <span className="font-normal text-slate-500">(opcional)</span>
           </label>
           <input
             type="text"
@@ -240,14 +266,9 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
             name="direccion"
             value={formData.direccion}
             onChange={handleInputChange}
-            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition-all duration-200 text-slate-900 placeholder-slate-400 ${
-              errors.direccion ? 'border-red-500 bg-red-100' : 'border-slate-300 bg-white'
-            }`}
-            placeholder="Calle Principal #123, Santo Domingo"
+            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition-all duration-200 text-slate-900 placeholder-slate-400 border-slate-300 bg-white"
+            placeholder="Opcional"
           />
-          {errors.direccion && (
-            <p className="mt-1 text-sm text-red-600">{errors.direccion}</p>
-          )}
         </div>
 
         <div className="flex justify-end space-x-4 pt-6 border-t border-slate-200">

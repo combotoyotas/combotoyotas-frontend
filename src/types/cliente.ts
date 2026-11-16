@@ -27,16 +27,17 @@ export interface Cliente {
 export interface ClienteCreateRequest {
   nombre: string
   telefono: string
-  email: string
-  identificacion: string
-  direccion: string
+  email?: string | null
+  identificacion?: string | null
+  direccion?: string | null
 }
 
 export interface ClienteUpdateRequest {
   nombre?: string
   telefono?: string
-  email?: string
-  direccion?: string
+  email?: string | null
+  identificacion?: string | null
+  direccion?: string | null
 }
 
 export type ClienteFiltroEstado = 'todos' | 'con_boletas' | 'pagadas' | 'reservadas' | 'abonadas'

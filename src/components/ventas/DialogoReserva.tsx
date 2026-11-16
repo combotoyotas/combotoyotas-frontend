@@ -104,6 +104,7 @@ export default function DialogoReserva({
       const reservaPayload = {
         rifa_id: rifaId,
         cliente: {
+          ...(cliente.id ? { id: cliente.id } : {}),
           nombre: cliente.nombre,
           telefono: cliente.telefono,
           email: cliente.email || undefined,
