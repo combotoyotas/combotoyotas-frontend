@@ -181,6 +181,19 @@ class VentasPublicasApiService {
     })
   }
 
+  async liberarBoletasLote(boletaIds: string[]): Promise<
+    ApiResponse<{
+      boletas_liberadas: number
+      numeros: number[]
+      fallos?: { boleta_id: string; message: string }[]
+    }>
+  > {
+    return this.request('/admin/dashboard/boletas-reservadas/liberar-lote', {
+      method: 'POST',
+      body: JSON.stringify({ boleta_ids: boletaIds }),
+    })
+  }
+
   /**
    * Obtener estadísticas generales de ventas públicas
    */

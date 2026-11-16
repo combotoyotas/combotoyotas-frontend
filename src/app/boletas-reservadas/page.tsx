@@ -43,10 +43,13 @@ export default function BoletasReservadasPage() {
   const [liberando, setLiberando] = useState<string | null>(null)
   const [liberandoVenta, setLiberandoVenta] = useState<string | null>(null)
   const [confirmDialog, setConfirmDialog] = useState<{
-    tipo: 'boleta' | 'venta'
-    id: string
+    tipo: 'boleta' | 'venta' | 'lote' | 'todas'
+    id?: string
+  ids?: string[]
     mensaje: string
   } | null>(null)
+  const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set())
+  const [liberandoLote, setLiberandoLote] = useState(false)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [userRol, setUserRol] = useState<string | null>(null)
 
@@ -57,6 +60,7 @@ export default function BoletasReservadasPage() {
       const response = await ventasPublicasApi.getBoletasReservadas()
       if (response.success && response.data) {
         setBoletas(response.data)
+        setSeleccionadas(new Set())
       } else {
         throw new Error(response.message || 'Error cargando boletas reservadas')
       }
@@ -172,6 +176,56 @@ export default function BoletasReservadasPage() {
     return matchSearch && matchOrigen && matchRifa
   })
 
+  const boletasLiberablesFiltradas = boletasFiltradas.filter(boletaLiberable)
+  const idsLiberablesFiltradas = boletasLiberablesFiltradas.map((b) => b.boleta_id)
+  const todasSeleccionadas =
+    idsLiberablesFiltradas.length > 0 &&
+    idsLiberablesFiltradas.every((id) => seleccionadas.has(id))
+
+  const toggleSeleccion = (boletaId: string) => {
+    setSeleccionadas((prev) => {
+      const next = new Set(prev)
+      if (next.has(boletaId)) next.delete(boletaId)
+      else next.add(boletaId)
+      return next
+    })
+  }
+
+  const toggleSeleccionarTodas = () => {
+    if (todasSeleccionadas) {
+      setSeleccionadas(new Set())
+    } else {
+      setSeleccionadas(new Set(idsLiberablesFiltradas))
+    }
+  }
+
+  const handleLiberarLote = async (ids: string[]) => {
+    if (ids.length === 0) return
+    try {
+      setLiberandoLote(true)
+      setConfirmDialog(null)
+      const response = await ventasPublicasApi.liberarBoletasLote(ids)
+      if (response.success) {
+        const n = response.data?.boletas_liberadas ?? ids.length
+        const fallos = response.data?.fallos?.length ?? 0
+        showSuccess(
+          fallos > 0
+            ? `Liberadas ${n} boleta(s); ${fallos} no se pudieron liberar`
+            : `Liberadas ${n} boleta(s) correctamente`
+        )
+        setSeleccionadas(new Set())
+        await fetchBoletas()
+      } else {
+        throw new Error(response.message || 'Error al liberar boletas')
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error al liberar boletas'
+      setError(message)
+    } finally {
+      setLiberandoLote(false)
+    }
+  }
+
   // Agrupar boletas por venta_id para el botón "Liberar Todas"
   const ventasConBoletas = boletasFiltradas.reduce((acc, b) => {
     if (b.venta_id) {
@@ -189,10 +243,14 @@ export default function BoletasReservadasPage() {
 
   const scopeHint =
     userRol === 'VENDEDOR'
-      ? 'Solo ves y puedes liberar boletas reservadas de tu inventario (asignadas a ti o vendidas por ti).'
+      ? 'Solo ves y puedes liberar boletas reservadas que están en tu inventario asignado. No aparecen boletas de otros vendedores ni del pool general.'
       : userRol === 'ADMIN'
-        ? 'Solo ves y puedes liberar boletas reservadas del pool común (sin vendedor asignado).'
+        ? 'Ves y liberas boletas reservadas del pool común (sin inventario de vendedor). Las de inventario privado las gestiona cada vendedor.'
+      : userRol === 'SUPER_ADMIN'
+        ? 'Ves todas las boletas reservadas del sistema.'
         : null
+
+  const boletaLiberable = (b: BoletaReservada) => b.puede_liberar !== false
 
   // Resumen
   const totalReservadas = boletas.length
@@ -238,12 +296,46 @@ export default function BoletasReservadasPage() {
                 </p>
               )}
             </div>
-            <button
-              onClick={fetchBoletas}
-              className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 hover:border-slate-300 flex items-center gap-2 min-h-[44px]"
-            >
-              Actualizar
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {boletasLiberablesFiltradas.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    disabled={liberandoLote || seleccionadas.size === 0}
+                    onClick={() =>
+                      setConfirmDialog({
+                        tipo: 'lote',
+                        ids: [...seleccionadas],
+                        mensaje: `¿Liberar ${seleccionadas.size} boleta(s) seleccionada(s)? Quedarán disponibles para venta.`,
+                      })
+                    }
+                    className="px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 disabled:opacity-50 min-h-[44px]"
+                  >
+                    {liberandoLote ? 'Liberando…' : `Liberar selección (${seleccionadas.size})`}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={liberandoLote}
+                    onClick={() =>
+                      setConfirmDialog({
+                        tipo: 'todas',
+                        ids: idsLiberablesFiltradas,
+                        mensaje: `¿Liberar las ${idsLiberablesFiltradas.length} boleta(s) visibles que puedes gestionar?`,
+                      })
+                    }
+                    className="px-4 py-2.5 bg-amber-600 text-white rounded-xl text-sm font-medium hover:bg-amber-700 disabled:opacity-50 min-h-[44px]"
+                  >
+                    Liberar todas visibles ({boletasLiberablesFiltradas.length})
+                  </button>
+                </>
+              )}
+              <button
+                onClick={fetchBoletas}
+                className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 hover:border-slate-300 flex items-center gap-2 min-h-[44px]"
+              >
+                Actualizar
+              </button>
+            </div>
           </div>
         </div>
 
@@ -364,6 +456,16 @@ export default function BoletasReservadasPage() {
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
+                    <th className="w-10 px-2 py-3">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-slate-300"
+                        checked={todasSeleccionadas}
+                        disabled={idsLiberablesFiltradas.length === 0 || liberandoLote}
+                        onChange={toggleSeleccionarTodas}
+                        aria-label="Seleccionar todas las boletas liberables visibles"
+                      />
+                    </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Boleta</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Proyecto</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Cliente</th>
@@ -376,6 +478,16 @@ export default function BoletasReservadasPage() {
                 <tbody className="divide-y divide-slate-100">
                   {boletasFiltradas.map((boleta) => (
                     <tr key={boleta.boleta_id} className={`hover:bg-slate-50 transition-colors ${isExpirada(boleta.bloqueo_hasta) ? 'bg-red-50/50' : ''}`}>
+                      <td className="px-2 py-3 align-middle">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-slate-300 disabled:opacity-40"
+                          checked={seleccionadas.has(boleta.boleta_id)}
+                          disabled={!boletaLiberable(boleta) || liberandoLote}
+                          onChange={() => toggleSeleccion(boleta.boleta_id)}
+                          aria-label={`Seleccionar boleta ${formatNumeroBoleta(boleta.numero, boleta.numeros)}`}
+                        />
+                      </td>
                       {/* Número de boleta */}
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 font-mono font-semibold text-sm">
@@ -543,10 +655,15 @@ export default function BoletasReservadasPage() {
               </button>
               <button
                 onClick={() => {
-                  if (confirmDialog.tipo === 'boleta') {
+                  if (confirmDialog.tipo === 'boleta' && confirmDialog.id) {
                     handleLiberarBoleta(confirmDialog.id)
-                  } else {
+                  } else if (confirmDialog.tipo === 'venta' && confirmDialog.id) {
                     handleLiberarVenta(confirmDialog.id)
+                  } else if (
+                    (confirmDialog.tipo === 'lote' || confirmDialog.tipo === 'todas') &&
+                    confirmDialog.ids
+                  ) {
+                    handleLiberarLote(confirmDialog.ids)
                   }
                 }}
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
