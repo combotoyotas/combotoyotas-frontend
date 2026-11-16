@@ -242,11 +242,7 @@ export default function BoletaTicket(props: BoletaTicketProps) {
           <img src={qrUrl} alt="QR" className="boleta-ticket__qr" crossOrigin="anonymous" />
         )}
 
-        {nota && (
-          <div className="boleta-ticket__nota" style={{ fontSize: 7, color: '#555' }}>
-            {nota}
-          </div>
-        )}
+        {nota ? <p className="boleta-ticket__nota">{nota}</p> : null}
 
         <div className="boleta-ticket__numero-grande">
           #{String(numDisplay ?? 0).padStart(4, '0')}

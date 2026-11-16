@@ -802,8 +802,8 @@ export default function InventarioVendedoresPage() {
               <p className="font-semibold text-emerald-900 mb-1">Inventario por vendedor activo</p>
               <p className="text-emerald-800/90 leading-relaxed">
                 Cada vendedor solo vende las boletas que tenga asignadas. Admin, superadmin y la web
-                usan el pool común ({resumen.pool.disponibles_libres.toLocaleString('es-CO')} libres
-                ahora).
+                usan el pool común ({resumen.pool.total.toLocaleString('es-CO')} boletas en oficina,
+                cualquier estado).
               </p>
               {vendedoresSinStock.length > 0 && (
                 <p className="mt-2 text-amber-900/90 text-xs">
@@ -814,18 +814,18 @@ export default function InventarioVendedoresPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
               {[
                 {
                   label: 'Pool admin / web',
-                  valor: resumen.pool.disponibles_libres,
-                  hint: 'Sin asignar a vendedor',
+                  valor: resumen.pool.total,
+                  hint: 'Oficina — sin asignar a vendedor (todos los estados)',
                 },
                 {
-                  label: 'Libres en vendedores',
-                  valor: soloVendedores.reduce((acc, v) => acc + v.asignadas_libres, 0),
+                  label: 'Total en vendedores',
+                  valor: soloVendedores.reduce((acc, v) => acc + v.asignadas_total, 0),
+                  hint: 'Inventario asignado (todos los estados)',
                 },
-                { label: 'Bloqueos vigentes', valor: resumen.bloqueos_vigentes },
                 { label: 'Total del proyecto', valor: resumen.rifa.total_boletas },
               ].map((kpi) => (
                 <div

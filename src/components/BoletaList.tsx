@@ -9,6 +9,7 @@ import { boletaApi } from '@/lib/boletaApi'
 import { ventasApi } from '@/lib/ventasApi'
 import type { BoletaBusquedaExterna } from '@/lib/boletaConsultaBusqueda'
 import BoletaConsultaExternaPanel from '@/components/boletas/BoletaConsultaExternaPanel'
+import BoletaNotaEditorModal from '@/components/boletas/BoletaNotaEditorModal'
 import {
   clearVentasNuevaDraft,
   saveVentasPrefillBoletaIds,
@@ -638,7 +639,7 @@ export default function BoletaList({
               <div style="display:flex;justify-content:center;width:100%;">
                 <img src="${qrSrc}" style="width:72px;height:72px;padding:3px;background:#fff;border:1px solid #111;" alt="QR" />
               </div>
-              ${(() => { const n = getNotaBoleta(boleta); return n ? `<div style="text-align:center;font-size:7px;color:#555;width:100%;">${n}</div>` : ''; })()}
+              ${(() => { const n = getNotaBoleta(boleta); return n ? `<p style="${BOLETA_BODY_TEXT};font-size:10px;font-weight:700;margin:2px 0 4px;">${n}</p>` : ''; })()}
               ${numsHtml}
               ${precioNum ? `<div style="${BOLETA_PRECIO_STYLE}">$${precioNum.toLocaleString('es-CO')}</div>` : ''}
             </div>
@@ -717,6 +718,15 @@ export default function BoletaList({
     setEditingNotaId(null)
     setNotaTemp('')
   }
+
+  const editingBoleta = useMemo(
+    () => (editingNotaId ? boletas.find((b) => b.id === editingNotaId) ?? null : null),
+    [editingNotaId, boletas]
+  )
+
+  const editingBoletaLabel = editingBoleta
+    ? `Boleta #${formatBoletaNumeros(editingBoleta.numeros, editingBoleta.numero)}`
+    : undefined
 
   if (loading) {
     return (
@@ -1254,54 +1264,26 @@ export default function BoletaList({
                         <div className="text-sm text-slate-600">{boleta.vendedor_info?.nombre || '-'}</div>
                       </td>
                       <td className="px-6 py-4">
-                        {editingNotaId === boleta.id ? (
-                          <div className="flex flex-col gap-1">
-                            <textarea
-                              value={notaTemp}
-                              onChange={(e) => setNotaTemp(e.target.value)}
-                              maxLength={500}
-                              rows={2}
-                              className="w-full text-xs border border-blue-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                              placeholder="Escribe una nota..."
-                              autoFocus
-                            />
-                            <div className="flex gap-1 justify-end">
-                              <button
-                                onClick={() => handleSaveNota(boleta.id)}
-                                disabled={savingNota}
-                                className="text-xs bg-green-500 text-white px-2 py-0.5 rounded hover:bg-green-600 disabled:opacity-50 transition-colors"
-                              >
-                                {savingNota ? '...' : '✓'}
-                              </button>
-                              <button
-                                onClick={handleCancelNota}
-                                disabled={savingNota}
-                                className="text-xs bg-slate-300 text-slate-700 px-2 py-0.5 rounded hover:bg-slate-400 disabled:opacity-50 transition-colors"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-start gap-1 group/nota">
-                            {getNotaBoleta(boleta) ? (
-                              <span className="text-xs text-slate-600 italic max-w-[150px] truncate" title={getNotaBoleta(boleta) || ''}>
-                                {getNotaBoleta(boleta)}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-slate-300 italic">—</span>
-                            )}
-                            <button
-                              onClick={() => handleEditNota(boleta)}
-                              className="text-slate-400 hover:text-blue-500 transition-colors p-0.5 opacity-0 group-hover/nota:opacity-100"
-                              title="Editar nota"
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex items-start gap-1 group/nota">
+                          {getNotaBoleta(boleta) ? (
+                            <span className="text-xs text-slate-600 italic max-w-[150px] truncate" title={getNotaBoleta(boleta) || ''}>
+                              {getNotaBoleta(boleta)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-300 italic">—</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleEditNota(boleta)}
+                            className="text-slate-400 hover:text-blue-500 transition-colors p-1 min-h-[32px] min-w-[32px] opacity-100 lg:opacity-0 lg:group-hover/nota:opacity-100"
+                            title="Editar nota"
+                            aria-label="Editar nota"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                        </div>
                       </td>
                       {/* <td className="px-6 py-4 whitespace-nowrap text-center">
                         {boleta.qr_url ? (
@@ -1351,6 +1333,16 @@ export default function BoletaList({
           </div>
         </div>
       )}
+
+      <BoletaNotaEditorModal
+        open={editingNotaId != null}
+        boletaLabel={editingBoletaLabel}
+        value={notaTemp}
+        onChange={setNotaTemp}
+        onSave={() => editingNotaId && void handleSaveNota(editingNotaId)}
+        onCancel={handleCancelNota}
+        saving={savingNota}
+      />
 
       {menuBoleta && !offlineMode && (
         <BoletaOpcionesMenu

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import BoletaTicket from './BoletaTicket'
 import ResponsiveBoletaWrapper from './ResponsiveBoletaWrapper'
 import BoletaAccionesBar from '@/components/boletas/BoletaAccionesBar'
+import BoletaNotaEditorModal from '@/components/boletas/BoletaNotaEditorModal'
 import { boletaApi } from '@/lib/boletaApi'
 import { formatRegistradoConRol } from '@/utils/formatAbonoRegistradoPor'
 import type { BoletaDetail } from '@/types/boleta'
@@ -313,46 +314,15 @@ export default function BoletaDetail({ boleta, onPrint, onBoletaUpdated }: Bolet
         </div>
       )}
 
-      {notaModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40">
-          <div
-            className="w-full max-w-md bg-white rounded-t-2xl sm:rounded-xl shadow-xl border border-slate-200 p-5"
-            role="dialog"
-            aria-labelledby="nota-boleta-title"
-          >
-            <h4 id="nota-boleta-title" className="text-lg font-semibold text-slate-900 mb-2">
-              Editar nota interna
-            </h4>
-            <p className="text-xs text-slate-500 mb-3">Visible en el ticket impreso (pie de la boleta).</p>
-            <textarea
-              value={notaTemp}
-              onChange={(e) => setNotaTemp(e.target.value)}
-              rows={4}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Nota para el vendedor…"
-              disabled={savingNota}
-            />
-            <div className="flex gap-2 mt-4 justify-end">
-              <button
-                type="button"
-                onClick={() => setNotaModalOpen(false)}
-                disabled={savingNota}
-                className="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleSaveNota()}
-                disabled={savingNota}
-                className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {savingNota ? 'Guardando…' : 'Guardar nota'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <BoletaNotaEditorModal
+        open={notaModalOpen}
+        boletaLabel={`Boleta #${String(boleta.numero).padStart(4, '0')}`}
+        value={notaTemp}
+        onChange={setNotaTemp}
+        onSave={() => void handleSaveNota()}
+        onCancel={() => setNotaModalOpen(false)}
+        saving={savingNota}
+      />
 
     </div>
   )

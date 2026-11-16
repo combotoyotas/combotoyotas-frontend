@@ -471,6 +471,17 @@ main {
   margin: 4px 0;
 }
 
+.boleta-ticket--oficial .boleta-ticket__nota {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+  width: 100%;
+  margin: 2px 0 4px;
+  text-align: center;
+  color: #111;
+  word-break: break-word;
+}
+
 .boleta-ticket--oficial .boleta-ticket__numero-grande {
   font-size: 28px;
   font-weight: 700;
