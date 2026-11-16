@@ -149,6 +149,13 @@ export default function BoletasReservadasPage() {
 
   const boletaLiberable = (b: BoletaReservada) => b.puede_liberar !== false
 
+  /** Bloqueo temporal / reserva sin ficha de cliente (no ventas con cliente). */
+  const boletaSinCliente = (b: BoletaReservada) =>
+    !b.cliente_id && !(b.cliente_nombre && b.cliente_nombre.trim())
+
+  const boletaLiberableEnLote = (b: BoletaReservada) =>
+    boletaLiberable(b) && boletaSinCliente(b)
+
   // Filtrar boletas — 4 cifras = exacto; 1–3 = prefijo; cualquier número del par
   const boletasFiltradas = boletas.filter(b => {
     const term = searchTerm.trim()
@@ -178,11 +185,11 @@ export default function BoletasReservadasPage() {
     return matchSearch && matchOrigen && matchRifa
   })
 
-  const boletasLiberablesFiltradas = boletasFiltradas.filter(boletaLiberable)
-  const idsLiberablesFiltradas = boletasLiberablesFiltradas.map((b) => b.boleta_id)
+  const boletasLiberablesEnLoteFiltradas = boletasFiltradas.filter(boletaLiberableEnLote)
+  const idsLiberablesEnLoteFiltradas = boletasLiberablesEnLoteFiltradas.map((b) => b.boleta_id)
   const todasSeleccionadas =
-    idsLiberablesFiltradas.length > 0 &&
-    idsLiberablesFiltradas.every((id) => seleccionadas.has(id))
+    idsLiberablesEnLoteFiltradas.length > 0 &&
+    idsLiberablesEnLoteFiltradas.every((id) => seleccionadas.has(id))
 
   const toggleSeleccion = (boletaId: string) => {
     setSeleccionadas((prev) => {
@@ -197,16 +204,23 @@ export default function BoletasReservadasPage() {
     if (todasSeleccionadas) {
       setSeleccionadas(new Set())
     } else {
-      setSeleccionadas(new Set(idsLiberablesFiltradas))
+      setSeleccionadas(new Set(idsLiberablesEnLoteFiltradas))
     }
   }
 
+  const filtrarIdsLoteSinCliente = (ids: string[]) =>
+    ids.filter((id) => {
+      const b = boletas.find((x) => x.boleta_id === id)
+      return b ? boletaLiberableEnLote(b) : false
+    })
+
   const handleLiberarLote = async (ids: string[]) => {
-    if (ids.length === 0) return
+    const idsLote = filtrarIdsLoteSinCliente(ids)
+    if (idsLote.length === 0) return
     try {
       setLiberandoLote(true)
       setConfirmDialog(null)
-      const response = await ventasPublicasApi.liberarBoletasLote(ids)
+      const response = await ventasPublicasApi.liberarBoletasLote(idsLote)
       if (response.success) {
         const n = response.data?.boletas_liberadas ?? ids.length
         const fallos = response.data?.fallos?.length ?? 0
@@ -297,21 +311,27 @@ export default function BoletasReservadasPage() {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {boletasLiberablesFiltradas.length > 0 && (
+              {boletasLiberablesEnLoteFiltradas.length > 0 && (
                 <>
                   <button
                     type="button"
-                    disabled={liberandoLote || seleccionadas.size === 0}
-                    onClick={() =>
+                    disabled={
+                      liberandoLote ||
+                      filtrarIdsLoteSinCliente([...seleccionadas]).length === 0
+                    }
+                    onClick={() => {
+                      const idsSel = filtrarIdsLoteSinCliente([...seleccionadas])
                       setConfirmDialog({
                         tipo: 'lote',
-                        ids: [...seleccionadas],
-                        mensaje: `¿Liberar ${seleccionadas.size} boleta(s) seleccionada(s)? Quedarán disponibles para venta.`,
+                        ids: idsSel,
+                        mensaje: `¿Liberar ${idsSel.length} boleta(s) bloqueada(s) sin cliente? Las reservas con cliente no se incluyen.`,
                       })
-                    }
+                    }}
                     className="px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 disabled:opacity-50 min-h-[44px]"
                   >
-                    {liberandoLote ? 'Liberando…' : `Liberar selección (${seleccionadas.size})`}
+                    {liberandoLote
+                      ? 'Liberando…'
+                      : `Liberar selección (${filtrarIdsLoteSinCliente([...seleccionadas]).length})`}
                   </button>
                   <button
                     type="button"
@@ -319,13 +339,13 @@ export default function BoletasReservadasPage() {
                     onClick={() =>
                       setConfirmDialog({
                         tipo: 'todas',
-                        ids: idsLiberablesFiltradas,
-                        mensaje: `¿Liberar las ${idsLiberablesFiltradas.length} boleta(s) visibles que puedes gestionar?`,
+                        ids: idsLiberablesEnLoteFiltradas,
+                        mensaje: `¿Liberar las ${idsLiberablesEnLoteFiltradas.length} boleta(s) bloqueada(s) sin cliente (visibles)? No se liberan las que ya tienen cliente.`,
                       })
                     }
                     className="px-4 py-2.5 bg-amber-600 text-white rounded-xl text-sm font-medium hover:bg-amber-700 disabled:opacity-50 min-h-[44px]"
                   >
-                    Liberar todas visibles ({boletasLiberablesFiltradas.length})
+                    Liberar bloqueos sin cliente ({boletasLiberablesEnLoteFiltradas.length})
                   </button>
                 </>
               )}
@@ -461,7 +481,7 @@ export default function BoletasReservadasPage() {
                         type="checkbox"
                         className="h-4 w-4 rounded border-slate-300"
                         checked={todasSeleccionadas}
-                        disabled={idsLiberablesFiltradas.length === 0 || liberandoLote}
+                        disabled={idsLiberablesEnLoteFiltradas.length === 0 || liberandoLote}
                         onChange={toggleSeleccionarTodas}
                         aria-label="Seleccionar todas las boletas liberables visibles"
                       />
@@ -483,7 +503,7 @@ export default function BoletasReservadasPage() {
                           type="checkbox"
                           className="h-4 w-4 rounded border-slate-300 disabled:opacity-40"
                           checked={seleccionadas.has(boleta.boleta_id)}
-                          disabled={!boletaLiberable(boleta) || liberandoLote}
+                          disabled={!boletaLiberableEnLote(boleta) || liberandoLote}
                           onChange={() => toggleSeleccion(boleta.boleta_id)}
                           aria-label={`Seleccionar boleta ${formatNumeroBoleta(boleta.numero, boleta.numeros)}`}
                         />
