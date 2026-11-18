@@ -355,8 +355,11 @@ export default function IntercambiosPage() {
     }
   }, [numPedido, rifaId])
 
+  const cupoDisponible = ctx?.cuota_intercambios?.puede_solicitar !== false
+
   const puedeEnviar =
     puedeCrearSolicitud &&
+    cupoDisponible &&
     numPedido.length === 4 &&
     numOfrezco.length === 4 &&
     preview?.intercambio_posible &&
@@ -502,6 +505,34 @@ export default function IntercambiosPage() {
         <p className="text-sm text-slate-600 -mt-2">
           Proyecto activo: <strong className="text-slate-900">{ctx.rifa.nombre}</strong>
         </p>
+      )}
+
+      {ctx?.cuota_intercambios && (esVendedor || esOficina) && (
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            ctx.cuota_intercambios.puede_solicitar
+              ? 'border-slate-200 bg-slate-50 text-slate-800'
+              : 'border-amber-300 bg-amber-50 text-amber-950'
+          }`}
+        >
+          <p className="font-semibold">
+            Intercambios aceptados:{' '}
+            <span className="font-mono">
+              {ctx.cuota_intercambios.aceptados}/{ctx.cuota_intercambios.limite}
+            </span>
+          </p>
+          <p className="text-xs mt-1 text-slate-600">
+            Solo cuentan intercambios <strong>aceptados</strong> desde la activación del límite (
+            {esOficina ? 'cuota compartida de oficina' : 'tu cupo personal'}). Los anteriores no
+            consumen cupo.
+          </p>
+          {!ctx.cuota_intercambios.puede_solicitar && (
+            <p className="text-xs mt-2 font-medium text-amber-900">
+              Límite alcanzado: no puedes crear nuevas solicitudes hasta que el cupo se libere en el
+              futuro.
+            </p>
+          )}
+        </div>
       )}
 
       {error && (

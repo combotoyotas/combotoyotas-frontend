@@ -17,10 +17,19 @@ export interface ConsultaNumeroIntercambio {
   intercambio_posible?: boolean
 }
 
+export interface IntercambioCuota {
+  aceptados: number
+  limite: number
+  cuota_desde: string
+  parte: 'vendedor' | 'oficina'
+  puede_solicitar: boolean
+}
+
 export interface IntercambioContexto {
   rifa: { id: string; nombre: string; estado: string }
   numeros_disponibles: number[]
   total_disponibles: number
+  cuota_intercambios?: IntercambioCuota | null
 }
 
 export type IntercambioDireccion = 'ENVIADA' | 'RECIBIDA'
