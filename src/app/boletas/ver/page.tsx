@@ -35,6 +35,8 @@ export default function VerBoletasPage() {
   const router = useRouter()
 
   const isVendedor = userRole === 'VENDEDOR'
+  const puedePdfInventario =
+    (userRole === 'VENDEDOR' || userRole === 'ADMIN') && Boolean(userId)
 
   // 1. Efecto inicial: Verificación de sesión y carga de rifas
   useEffect(() => {
@@ -300,7 +302,7 @@ export default function VerBoletasPage() {
             )}
           </div>
 
-          {selectedRifa && userRole === 'VENDEDOR' && userId && !offlineMode && (
+          {selectedRifa && puedePdfInventario && !offlineMode && (
             <div className="mt-4 pt-4 border-t border-slate-100">
               <button
                 type="button"
@@ -314,7 +316,9 @@ export default function VerBoletasPage() {
                 {descargandoInventario ? 'Generando PDF…' : 'Descargar inventario'}
               </button>
               <p className="text-xs text-slate-500 mt-2">
-                Mismo reporte PDF que en inventario por vendedor (tus boletas asignadas en este proyecto).
+                {userRole === 'ADMIN'
+                  ? 'Mismo formato PDF que los vendedores: cuadrícula del pool libre (boletas sin asignar a vendedor).'
+                  : 'Mismo reporte PDF que en inventario por vendedor (tus boletas asignadas en este proyecto).'}
               </p>
             </div>
           )}

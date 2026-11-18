@@ -126,7 +126,9 @@ export default function ClientesPage() {
       setEditingCliente(null)
       fetchClientes(pagination.page, currentSearch, filtroActivo)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al guardar cliente')
+      const message = err instanceof Error ? err.message : 'Error al guardar cliente'
+      setError(message)
+      throw err
     }
   }
 

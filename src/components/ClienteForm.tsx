@@ -1,8 +1,29 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Cliente, ClienteCreateRequest, ClienteUpdateRequest } from '@/types/cliente'
 import { clienteApi } from '@/lib/clienteApi'
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function displayOptionalText(value: string | null | undefined): string {
+  if (value == null) return ''
+  const s = String(value).trim()
+  if (!s || s === '—' || s.toLowerCase() === 'null') return ''
+  return s
+}
+
+function displayEmail(value: string | null | undefined): string {
+  const s = displayOptionalText(value)
+  if (!s) return ''
+  return EMAIL_PATTERN.test(s) ? s : ''
+}
+
+function displayIdentificacion(value: string | null | undefined): string {
+  const s = displayOptionalText(value)
+  if (!s) return ''
+  return s.length >= 5 ? s : ''
+}
 
 interface ClienteFormProps {
   cliente?: Cliente | null
@@ -19,9 +40,11 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
     direccion: ''
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [generandoId, setGenerandoId] = useState(false)
   const [esVendedor, setEsVendedor] = useState(false)
+  const initialEditSnapshot = useRef<typeof formData | null>(null)
 
   useEffect(() => {
     try {
@@ -36,14 +59,20 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
 
   useEffect(() => {
     if (cliente) {
-      setFormData({
-        nombre: cliente.nombre || '',
-        telefono: cliente.telefono || '',
-        email: cliente.email || '',
-        identificacion: cliente.identificacion || '',
-        direccion: cliente.direccion || ''
-      })
+      const next = {
+        nombre: displayOptionalText(cliente.nombre),
+        telefono: displayOptionalText(cliente.telefono),
+        email: displayEmail(cliente.email),
+        identificacion: displayIdentificacion(cliente.identificacion),
+        direccion: displayOptionalText(cliente.direccion),
+      }
+      setFormData(next)
+      initialEditSnapshot.current = { ...next }
+    } else {
+      initialEditSnapshot.current = null
     }
+    setSubmitError(null)
+    setErrors({})
   }, [cliente])
 
   const isEdit = Boolean(cliente)
@@ -91,13 +120,15 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
     if (!formData.telefono.trim()) {
       newErrors.telefono = 'El teléfono es requerido'
     }
-    if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    const emailTrim = formData.email.trim()
+    if (emailTrim && !EMAIL_PATTERN.test(emailTrim)) {
       newErrors.email = 'El email no es válido'
     }
     if (identificacionRequeridaEnAlta && !formData.identificacion.trim()) {
       newErrors.identificacion = 'La identificación es requerida'
     }
-    if (formData.identificacion.trim() && formData.identificacion.trim().length < 5) {
+    const idTrim = formData.identificacion.trim()
+    if (idTrim && idTrim.length < 5) {
       newErrors.identificacion = 'Mínimo 5 caracteres si ingresas identificación'
     }
 
@@ -105,15 +136,37 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
     return Object.keys(newErrors).length === 0
   }
 
-  const buildPayload = () => {
-    const base = {
-      nombre: formData.nombre.trim(),
-      telefono: formData.telefono.trim(),
-      email: formData.email.trim() || (isEdit ? null : undefined),
-      identificacion: formData.identificacion.trim() || (isEdit ? null : undefined),
-      direccion: formData.direccion.trim() || (isEdit ? null : undefined),
+  const buildPayload = (): ClienteCreateRequest | ClienteUpdateRequest => {
+    const nombre = formData.nombre.trim()
+    const telefono = formData.telefono.trim()
+
+    if (isEdit) {
+      const payload: ClienteUpdateRequest = { nombre, telefono }
+      const snap = initialEditSnapshot.current
+      const changed = (key: keyof typeof formData) =>
+        !snap || formData[key].trim() !== (snap[key] || '').trim()
+
+      if (changed('email')) {
+        const emailTrim = formData.email.trim()
+        payload.email = emailTrim || null
+      }
+      if (changed('identificacion')) {
+        const idTrim = formData.identificacion.trim()
+        payload.identificacion = idTrim || null
+      }
+      if (changed('direccion')) {
+        payload.direccion = formData.direccion.trim() || null
+      }
+      return payload
     }
-    return base
+
+    return {
+      nombre,
+      telefono,
+      email: formData.email.trim() || undefined,
+      identificacion: formData.identificacion.trim() || undefined,
+      direccion: formData.direccion.trim() || undefined,
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -124,12 +177,18 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
     }
 
     setLoading(true)
+    setSubmitError(null)
     try {
-      await onSubmit(buildPayload() as ClienteCreateRequest | ClienteUpdateRequest)
+      await onSubmit(buildPayload())
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'No se pudo guardar el cliente')
     } finally {
       setLoading(false)
     }
   }
+
+  const hasRequiredFields =
+    Boolean(formData.nombre.trim()) && Boolean(formData.telefono.trim())
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
@@ -153,7 +212,13 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      {submitError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {submitError}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} noValidate className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label htmlFor="nombre" className="block text-sm font-bold text-black mb-2">
@@ -200,7 +265,9 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
               Correo Electrónico <span className="font-normal text-slate-500">(opcional)</span>
             </label>
             <input
-              type="email"
+              type="text"
+              inputMode="email"
+              autoComplete="email"
               id="email"
               name="email"
               value={formData.email}
@@ -281,7 +348,7 @@ export default function ClienteForm({ cliente, onSubmit, onCancel }: ClienteForm
           </button>
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !hasRequiredFields}
             className="px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? 'Guardando...' : (cliente ? 'Actualizar' : 'Crear')}

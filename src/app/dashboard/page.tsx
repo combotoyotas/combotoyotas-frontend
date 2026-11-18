@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import VentasOnlineBanner from '@/components/ventasPublicas/VentasOnlineBanner'
 import { resolveVentasEntryHref } from '@/lib/ventasNavigation'
+import { BRAND_SHORT } from '@/config/brand'
 
 interface User {
   id: string
@@ -85,7 +86,7 @@ export default function DashboardPage() {
                 </svg>
               </div>
               <div>
-                <h1 className="text-lg font-semibold text-slate-900 leading-tight">SUPERTOYOTA</h1>
+                <h1 className="text-lg font-semibold text-slate-900 leading-tight">{BRAND_SHORT}</h1>
                 <p className="text-[11px] text-slate-400 leading-none">Panel de Administración</p>
               </div>
             </div>

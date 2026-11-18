@@ -67,6 +67,13 @@ export const APP_MODULES: AppModule[] = [
     roles: ['SUPER_ADMIN', 'ADMIN', 'VENDEDOR'],
   },
   {
+    id: 'intercambios',
+    label: 'Intercambios',
+    href: '/intercambios',
+    matchPrefixes: ['/intercambios'],
+    roles: ['SUPER_ADMIN', 'ADMIN', 'VENDEDOR'],
+  },
+  {
     id: 'historial',
     label: 'Historial',
     href: '/historial',

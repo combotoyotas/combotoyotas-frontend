@@ -51,6 +51,7 @@ const MODULE_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   vendedores: UserCog,
   'inventario-vendedores': Package,
   trueques: ArrowLeftRight,
+  intercambios: ArrowLeftRight,
   clientes: Users,
   rifas: Gift,
   ganadores: Trophy,
