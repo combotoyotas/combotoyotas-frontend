@@ -12,28 +12,14 @@ import {
   type IntercambioSolicitud,
 } from '@/lib/intercambiosApi'
 
+import {
+  cargarLeidas,
+  claveLeida,
+  clavePendingEntrante,
+  guardarLeidas,
+} from '@/lib/intercambiosLeidas'
+
 const POLL_MS = 12_000
-const LEIDAS_KEY = 'intercambios_leidas_v1'
-
-function claveLeida(s: IntercambioSolicitud) {
-  return `${s.id}:${s.estado}`
-}
-
-function cargarLeidas(): Set<string> {
-  if (typeof window === 'undefined') return new Set()
-  try {
-    const raw = localStorage.getItem(LEIDAS_KEY)
-    if (!raw) return new Set()
-    const arr = JSON.parse(raw) as string[]
-    return new Set(Array.isArray(arr) ? arr : [])
-  } catch {
-    return new Set()
-  }
-}
-
-function guardarLeidas(set: Set<string>) {
-  localStorage.setItem(LEIDAS_KEY, JSON.stringify([...set]))
-}
 
 function pad4(n: number) {
   return String(n).padStart(4, '0')
@@ -422,6 +408,7 @@ export default function IntercambiosPage() {
         ])
         setLeidas((prev) => {
           const next = new Set(prev)
+          next.add(clavePendingEntrante(id))
           next.add(`${id}:PENDIENTE`)
           next.add(`${id}:ACEPTADA`)
           next.add(`${id}:RECHAZADA`)

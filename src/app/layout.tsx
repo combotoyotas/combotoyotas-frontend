@@ -5,6 +5,7 @@ import PausaGuard from "@/components/PausaGuard";
 import ModuleShell from "@/components/layout/ModuleShell";
 import PwaNativeEffects from "@/components/pwa/PwaNativeEffects";
 import PwaUpdatePrompt from "@/components/pwa/PwaUpdatePrompt";
+import IntercambiosNotifyPrompt from "@/components/intercambios/IntercambiosNotifyPrompt";
 import { BRAND_NAME, BRAND_SHORT, BRAND_THEME_COLOR } from "@/config/brand";
 
 const geistSans = Geist({
@@ -68,6 +69,7 @@ export default function RootLayout({
       >
         <PwaNativeEffects />
         <PwaUpdatePrompt />
+        <IntercambiosNotifyPrompt />
         <PausaGuard>
           <ModuleShell>{children}</ModuleShell>
         </PausaGuard>
