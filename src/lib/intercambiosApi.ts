@@ -31,6 +31,7 @@ export interface IntercambioSolicitud {
   rifa_nombre?: string
   solicitante_id: string
   solicitante_nombre?: string
+  solicitante_es_oficina?: boolean
   contraparte_tipo: 'OFICINA' | 'VENDEDOR'
   contraparte_vendedor_id: string | null
   contraparte_vendedor_nombre?: string

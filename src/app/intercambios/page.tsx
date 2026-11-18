@@ -39,6 +39,11 @@ function pad4(n: number) {
   return String(n).padStart(4, '0')
 }
 
+function etiquetaSolicitante(s: IntercambioSolicitud) {
+  if (s.solicitante_es_oficina || s.solicitante_nombre === 'Oficina') return 'Oficina'
+  return s.solicitante_nombre || 'Un vendedor'
+}
+
 const ESTADO_STYLE: Record<string, string> = {
   PENDIENTE: 'bg-amber-100 text-amber-900',
   ACEPTADA: 'bg-emerald-100 text-emerald-900',
@@ -104,7 +109,7 @@ function TarjetaSolicitud({
     s.direccion ?? (variant === 'aprobar' ? 'RECIBIDA' : 'ENVIADA')
   const contraparte =
     s.contraparte_tipo === 'OFICINA' ? 'Oficina' : s.contraparte_vendedor_nombre || 'Vendedor'
-  const solicitante = s.solicitante_nombre || 'Un vendedor'
+  const solicitante = etiquetaSolicitante(s)
 
   const textoPrincipal = (() => {
     if (variant === 'aprobar') {
@@ -189,9 +194,20 @@ function TarjetaSolicitud({
       {textoPrincipal}
       {s.estado === 'ACEPTADA' && s.resultado?.resumen && dir === 'ENVIADA' && (
         <p className="text-sm text-emerald-900 bg-emerald-50 rounded-xl px-3 py-2.5">
-          Te quedó <strong className="font-mono">#{s.resultado.resumen.numero_solicitado_fmt}</strong>{' '}
-          en tu inventario. {contraparte} quedó con{' '}
-          <strong className="font-mono">#{s.resultado.resumen.numero_ofrecido_fmt}</strong>.
+          {s.solicitante_es_oficina ? (
+            <>
+              Oficina quedó con{' '}
+              <strong className="font-mono">#{s.resultado.resumen.numero_solicitado_fmt}</strong> en el
+              pool. {contraparte} quedó con{' '}
+              <strong className="font-mono">#{s.resultado.resumen.numero_ofrecido_fmt}</strong>.
+            </>
+          ) : (
+            <>
+              Te quedó <strong className="font-mono">#{s.resultado.resumen.numero_solicitado_fmt}</strong>{' '}
+              en tu inventario. {contraparte} quedó con{' '}
+              <strong className="font-mono">#{s.resultado.resumen.numero_ofrecido_fmt}</strong>.
+            </>
+          )}
         </p>
       )}
       {s.estado === 'ACEPTADA' && s.resultado?.resumen && dir === 'RECIBIDA' && (
@@ -255,6 +271,8 @@ export default function IntercambiosPage() {
   busyRef.current = busy
 
   const esVendedor = rol === 'VENDEDOR'
+  const esOficina = rol === 'ADMIN' || rol === 'SUPER_ADMIN'
+  const puedeCrearSolicitud = esVendedor || esOficina
   const rifaId = ctx?.rifa.id ?? ''
 
   const numerosFiltrados = useMemo(() => {
@@ -338,11 +356,12 @@ export default function IntercambiosPage() {
   }, [numPedido, rifaId])
 
   const puedeEnviar =
-    esVendedor &&
+    puedeCrearSolicitud &&
     numPedido.length === 4 &&
     numOfrezco.length === 4 &&
     preview?.intercambio_posible &&
-    ctx?.numeros_disponibles.includes(Number(numOfrezco))
+    ctx?.numeros_disponibles.includes(Number(numOfrezco)) &&
+    (esVendedor || preview?.contraparte_tipo === 'VENDEDOR')
 
   const enviarSolicitud = async () => {
     setError(null)
@@ -394,7 +413,10 @@ export default function IntercambiosPage() {
         } else {
           setOkMsg('Actualizado.')
         }
-        await Promise.all([cargarListado(), esVendedor ? recargarContexto() : Promise.resolve()])
+        await Promise.all([
+          cargarListado(),
+          puedeCrearSolicitud ? recargarContexto() : Promise.resolve(),
+        ])
         setLeidas((prev) => {
           const next = new Set(prev)
           next.add(`${id}:PENDIENTE`)
@@ -469,7 +491,11 @@ export default function IntercambiosPage() {
     <div className="max-w-lg mx-auto px-3 py-4 pb-28 space-y-5">
       <PageHeader
         title="Intercambios"
-        description="Intercambia un número libre del inventario de otro vendedor u oficina por uno tuyo."
+        description={
+          esOficina
+            ? 'Como oficina, solicita un número del inventario de un vendedor y ofrece uno del pool de oficina.'
+            : 'Intercambia un número libre del inventario de otro vendedor u oficina por uno tuyo.'
+        }
       />
 
       {ctx?.rifa && (
@@ -554,7 +580,9 @@ export default function IntercambiosPage() {
                   s={s}
                   variant="historial"
                   busy={busy}
-                  onCancelar={esVendedor ? wrapAccion(intercambiosApi.cancelar) : undefined}
+                  onCancelar={
+                    puedeCrearSolicitud ? wrapAccion(intercambiosApi.cancelar) : undefined
+                  }
                 />
               ))}
             </div>
@@ -592,7 +620,9 @@ export default function IntercambiosPage() {
                 variant="historial"
                 busy={busy}
                 onCancelar={
-                  esVendedor && s.direccion === 'ENVIADA' && s.estado === 'PENDIENTE'
+                  puedeCrearSolicitud &&
+                  s.direccion === 'ENVIADA' &&
+                  s.estado === 'PENDIENTE'
                     ? wrapAccion(intercambiosApi.cancelar)
                     : undefined
                 }
@@ -602,9 +632,16 @@ export default function IntercambiosPage() {
         </section>
       )}
 
-      {esVendedor && (
+      {puedeCrearSolicitud && (
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-5">
-          <h2 className="text-lg font-semibold text-slate-900">Nueva solicitud</h2>
+          <h2 className="text-lg font-semibold text-slate-900">
+            {esOficina ? 'Nueva solicitud (oficina)' : 'Nueva solicitud'}
+          </h2>
+          {esOficina && (
+            <p className="text-sm text-slate-600 -mt-2">
+              El vendedor verá la solicitud como <strong>Oficina</strong>, no con tu nombre personal.
+            </p>
+          )}
 
           <div className="space-y-2">
             <label htmlFor="num-pedido" className="text-sm font-medium text-slate-800">
@@ -652,7 +689,9 @@ export default function IntercambiosPage() {
 
           <div className="space-y-2">
             <label htmlFor="num-ofrezco" className="text-sm font-medium text-slate-800">
-              Número que ofreces (tu inventario libre)
+              {esOficina
+                ? 'Número que ofrece la oficina (pool libre)'
+                : 'Número que ofreces (tu inventario libre)'}
             </label>
             <input
               id="num-ofrezco"
@@ -670,7 +709,8 @@ export default function IntercambiosPage() {
               }}
             />
             <p className="text-xs text-slate-500">
-              {ctx?.total_disponibles ?? 0} números libres en tu inventario — elige en la lista o escribe arriba
+              {ctx?.total_disponibles ?? 0} números libres{' '}
+              {esOficina ? 'en el pool de oficina' : 'en tu inventario'} — elige en la lista o escribe arriba
             </p>
             <input
               type="search"
