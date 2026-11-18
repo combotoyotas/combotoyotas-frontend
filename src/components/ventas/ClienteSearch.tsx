@@ -191,8 +191,9 @@ export default function ClienteSearch({
     setCreando(true)
     setError(null)
 
+    const idTrim = clienteNuevo.identificacion?.trim()
+
     try {
-      const idTrim = clienteNuevo.identificacion?.trim()
       const payload = {
         ...clienteNuevo,
         email: clienteNuevo.email?.trim() || undefined,
@@ -200,7 +201,7 @@ export default function ClienteSearch({
         identificacion: idTrim || undefined,
       }
       const response = await ventasApi.crearCliente(payload)
-      const nuevoCliente = (response as { data: Cliente }).data
+      const nuevoCliente = response.data
       
       console.log('Cliente creado exitosamente:', nuevoCliente)
       

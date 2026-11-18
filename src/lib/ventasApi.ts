@@ -284,13 +284,10 @@ class VentasApiService {
   }
 
   async crearCliente(cliente: Cliente) {
-    return this.request<{ cliente: Cliente }>(
-      `/clientes`,
-      {
-        method: 'POST',
-        body: JSON.stringify(cliente)
-      }
-    )
+    return this.request<Cliente>(`/clientes`, {
+      method: 'POST',
+      body: JSON.stringify(cliente),
+    })
   }
 
   async getNextIdentificacion() {
