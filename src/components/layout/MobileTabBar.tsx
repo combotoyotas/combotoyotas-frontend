@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, ShoppingCart, Ticket, Users, Menu } from 'lucide-react'
 import { UserRole } from '@/config/modules'
-import { getModuleLastPath } from '@/lib/moduleLastPath'
 import { resolveVentasEntryHref } from '@/lib/ventasNavigation'
+import { resolveModuleNavHref } from '@/lib/moduleSessionCache'
 
 type Props = {
   role: UserRole | null
@@ -16,6 +16,7 @@ export default function MobileTabBar({ role, onOpenMenu }: Props) {
   const pathname = usePathname() || '/'
   const ventasHref = resolveVentasEntryHref()
   const esVendedor = role === 'VENDEDOR'
+  const boletasHref = resolveModuleNavHref('boletas', '/boletas/ver', role)
 
   const items = [
     { id: 'dashboard', href: '/dashboard', label: 'Inicio', icon: LayoutDashboard, match: (p: string) => p === '/dashboard' },
@@ -29,7 +30,7 @@ export default function MobileTabBar({ role, onOpenMenu }: Props) {
     },
     {
       id: 'boletas',
-      href: getModuleLastPath('boletas', '/boletas/ver'),
+      href: boletasHref,
       label: 'Boletas',
       icon: Ticket,
       match: (p: string) => p.startsWith('/boletas'),

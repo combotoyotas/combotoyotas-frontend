@@ -8,6 +8,7 @@ import BoletaDetailComponent from '@/components/BoletaDetail'
 import { formatBoletaNumeros } from '@/utils/formatBoletaNumeros'
 import { boletaEstadoDisplay } from '@/utils/boletaEstadoDisplay'
 import { getModuleLastPath } from '@/lib/moduleLastPath'
+import { isAdminRole } from '@/lib/moduleSessionCache'
 import { descargarBoletaDetalleComoFoto } from '@/lib/boletaDescargarDesdeDetalle'
 import { isMobileDevice } from '@/utils/downloadBoletaImage'
 
@@ -21,12 +22,16 @@ export default function BoletaDetailPage() {
   const [descargandoFoto, setDescargandoFoto] = useState(false)
 
   const volverALista = useCallback(() => {
+    if (isAdminRole(userRole)) {
+      router.push('/boletas/ver')
+      return
+    }
     if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back()
       return
     }
     router.push(getModuleLastPath('boletas', '/boletas/ver'))
-  }, [router])
+  }, [router, userRole])
 
   useEffect(() => {
     const token = localStorage.getItem('token')

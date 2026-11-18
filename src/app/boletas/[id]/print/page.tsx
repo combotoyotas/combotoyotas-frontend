@@ -7,6 +7,7 @@ import BoletaTicket from '@/components/BoletaTicket'
 import ResponsiveBoletaWrapper from '@/components/ResponsiveBoletaWrapper'
 import { downloadBoletaImage, isMobileDevice } from '@/utils/downloadBoletaImage'
 import { getModuleLastPath } from '@/lib/moduleLastPath'
+import { isAdminRole, readUserRolFromStorage } from '@/lib/moduleSessionCache'
 import type { BoletaDetail } from '@/types/boleta'
 
 export default function BoletaPrintPage() {
@@ -87,6 +88,10 @@ export default function BoletaPrintPage() {
   }, [boleta, buildFilename])
 
   const volver = useCallback(() => {
+    if (isAdminRole(readUserRolFromStorage())) {
+      router.push('/boletas/ver')
+      return
+    }
     if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back()
       return

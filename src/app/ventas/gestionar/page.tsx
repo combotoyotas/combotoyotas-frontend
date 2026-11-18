@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { setModuleLastPath } from '@/lib/moduleLastPath'
+import { readUserRolFromStorage, shouldPersistModulePath } from '@/lib/moduleSessionCache'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ClienteSearch from '@/components/ventas/ClienteSearch'
 import { Cliente } from '@/types/ventas'
@@ -37,7 +38,10 @@ function GestionarAbonosPage() {
   const autoBusquedaEjecutada = useRef(false)
 
   useEffect(() => {
-    setModuleLastPath('ventas', '/ventas/gestionar')
+    const rol = readUserRolFromStorage()
+    if (shouldPersistModulePath('ventas', rol)) {
+      setModuleLastPath('ventas', '/ventas/gestionar')
+    }
   }, [])
 
   const [modoBusqueda, setModoBusqueda] = useState<'boleta' | 'cliente'>('boleta')

@@ -32,8 +32,9 @@ import {
   isModuleActive,
   normalizeRole,
 } from '@/config/modules'
-import { clearModuleLastPaths, getModuleLastPath } from '@/lib/moduleLastPath'
+import { clearModuleLastPaths } from '@/lib/moduleLastPath'
 import { resolveVentasEntryHref } from '@/lib/ventasNavigation'
+import { resolveModuleNavHref } from '@/lib/moduleSessionCache'
 import { TokenManager } from '@/utils/auth'
 import BrandLogo from '@/components/brand/BrandLogo'
 import { BRAND_NAME } from '@/config/brand'
@@ -73,17 +74,19 @@ function NavItem({
   module,
   pathname,
   onNavigate,
+  userRol,
 }: {
   module: AppModule
   pathname: string
   onNavigate?: () => void
+  userRol?: string | null
 }) {
   const active = isModuleActive(pathname, module)
   const Icon = MODULE_ICONS[module.id] ?? FileText
   const href =
     module.id === 'ventas'
       ? resolveVentasEntryHref()
-      : getModuleLastPath(module.id, module.href)
+      : resolveModuleNavHref(module.id, module.href, userRol)
 
   return (
     <Link
@@ -170,6 +173,7 @@ function SidebarContent({
             module={module}
             pathname={pathname}
             onNavigate={onNavigate}
+            userRol={user?.rol}
           />
         ))}
       </nav>

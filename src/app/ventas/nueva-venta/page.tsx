@@ -28,6 +28,7 @@ import {
   saveVentasNuevaDraft,
 } from '@/lib/ventasNuevaDraft'
 import { setModuleLastPath } from '@/lib/moduleLastPath'
+import { isAdminRole, readUserRolFromStorage, shouldPersistModulePath } from '@/lib/moduleSessionCache'
 
 // Componente temporal para SelectorRifa
 function SelectorRifa({ rifas, rifaSeleccionada, onRifaSeleccionada }: { 
@@ -93,6 +94,7 @@ function VentasPageContent() {
     identificacion: ''
   })
   const draftRestoredRef = useRef(false)
+  const esAdminRef = useRef(false)
 
   // WebSocket para actualizaciones en tiempo real
   const { eventosRecientes, conectado } = useVentasRealTime(
@@ -254,15 +256,26 @@ function VentasPageContent() {
   )
 
   useEffect(() => {
-    if (isBrowserFullReload()) {
+    const rol = readUserRolFromStorage()
+    esAdminRef.current = isAdminRole(rol)
+    if (esAdminRef.current) {
+      clearVentasNuevaDraft()
+      clearVentasAutoPrefillCache()
+    } else if (isBrowserFullReload()) {
       clearVentasAutoPrefillCache()
     }
     cargarRifas()
-    setModuleLastPath('ventas', '/ventas/nueva-venta')
+    if (shouldPersistModulePath('ventas', rol)) {
+      setModuleLastPath('ventas', '/ventas/nueva-venta')
+    }
   }, [])
 
   useEffect(() => {
     if (loading || rifas.length === 0 || draftRestoredRef.current) return
+    if (esAdminRef.current) {
+      draftRestoredRef.current = true
+      return
+    }
 
     const fullReload = isBrowserFullReload()
     const autoVender = searchParams.get('auto') === '1'
@@ -320,6 +333,7 @@ function VentasPageContent() {
 
   useEffect(() => {
     if (loading || !draftRestoredRef.current) return
+    if (esAdminRef.current) return
     saveVentasNuevaDraft({
       pasoActual,
       rifaId: rifaSeleccionada?.id ?? null,
@@ -327,7 +341,10 @@ function VentasPageContent() {
       cliente,
       mostrarReservas,
     })
-    setModuleLastPath('ventas', '/ventas/nueva-venta')
+    const rol = readUserRolFromStorage()
+    if (shouldPersistModulePath('ventas', rol)) {
+      setModuleLastPath('ventas', '/ventas/nueva-venta')
+    }
   }, [
     loading,
     pasoActual,

@@ -9,6 +9,7 @@ import {
   type UserRole,
 } from '@/config/modules'
 import { setModuleLastPath } from '@/lib/moduleLastPath'
+import { readUserRolFromStorage, shouldPersistModulePath } from '@/lib/moduleSessionCache'
 
 function moduleCacheKey(pathname: string, role: UserRole | null): string | null {
   return getActiveModule(pathname, role)?.id ?? null
@@ -50,7 +51,10 @@ export default function ModuleKeepAlive({ children }: { children: ReactNode }) {
     prevPathRef.current = pathname
 
     const mod = getActiveModule(pathname, role)
-    if (mod) setModuleLastPath(mod.id, pathname)
+    const rol = readUserRolFromStorage()
+    if (mod && shouldPersistModulePath(mod.id, rol)) {
+      setModuleLastPath(mod.id, pathname)
+    }
 
     const y = scrollRef.current.get(activeKey)
     if (y != null) {
