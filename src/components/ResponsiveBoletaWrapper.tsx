@@ -44,11 +44,15 @@ export default function ResponsiveBoletaWrapper({ children, id }: { children: Re
       const ticket = inner.querySelector('.boleta-ticket') as HTMLElement | null
       if (!ticket) return
       const h = ticket.offsetHeight
-      if (h > 0) setTicketHeight(h)
+      if (h > 0) {
+        setTicketHeight((prev) => (Math.abs(prev - h) <= 2 ? prev : h))
+      }
     }
 
     observeTicket()
-    const ro = new ResizeObserver(observeTicket)
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(observeTicket)
+    })
     const ticket = inner.querySelector('.boleta-ticket')
     if (ticket) ro.observe(ticket)
     return () => ro.disconnect()
@@ -72,7 +76,7 @@ export default function ResponsiveBoletaWrapper({ children, id }: { children: Re
           transform: `translateX(-50%) scale(${scale})`,
           transformOrigin: 'top center',
           width: `${BOLETA_WIDTH}px`,
-          height: `${ticketHeight}px`,
+          height: 'auto',
           boxSizing: 'border-box',
         }}
       >

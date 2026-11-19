@@ -83,6 +83,7 @@ interface VentaNormalizada {
   telefono: string
   email?: string
   cliente_identificacion?: string
+  cliente_direccion?: string | null
   rifa_nombre?: string
   created_at?: string
   vendedor_nombre?: string | null
@@ -144,6 +145,7 @@ function normalizarVenta(d: any): VentaNormalizada {
     telefono: d.cliente_telefono ?? d.telefono ?? '',
     email: d.cliente_email ?? d.email,
     cliente_identificacion: d.cliente_identificacion ?? '',
+    cliente_direccion: d.cliente_direccion ?? d.direccion ?? null,
     rifa_nombre: d.rifa_nombre ?? '',
     created_at: d.created_at,
     vendedor_nombre: d.vendedor_nombre ?? null,
@@ -638,7 +640,7 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
                       clienteInfo={{
                         nombre: venta.nombre,
                         identificacion: venta.cliente_identificacion,
-                        direccion: (venta as { cliente_direccion?: string }).cliente_direccion,
+                        direccion: venta.cliente_direccion,
                       }}
                       deuda={b.saldo_pendiente_boleta ?? 0}
                       reservadaHasta={b.bloqueo_hasta}

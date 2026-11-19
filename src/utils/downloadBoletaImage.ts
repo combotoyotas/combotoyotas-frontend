@@ -1,5 +1,7 @@
 import {
   BOLETA_WIDTH,
+  BOLETA_LEFT_WIDTH,
+  BOLETA_RIGHT_WIDTH,
   BOLETA_DEFAULT_HEIGHT,
 } from '@/constants/boletaDimensions'
 
@@ -19,36 +21,6 @@ function isIOS(): boolean {
 function exportScale(custom?: number): number {
   if (custom) return custom
   return isMobileDevice() ? 2 : 3
-}
-
-/**
- * Neutralise CSS transforms on ancestors so html2canvas captures at 1:1.
- */
-function neutraliseAncestorTransforms(el: HTMLElement): () => void {
-  const saved: { el: HTMLElement; transform: string; height: string; minHeight: string }[] = []
-  let node = el.parentElement
-  while (node && node !== document.documentElement) {
-    const computed = getComputedStyle(node)
-    if (node.style.transform || computed.transform !== 'none') {
-      saved.push({
-        el: node,
-        transform: node.style.transform,
-        height: node.style.height,
-        minHeight: node.style.minHeight,
-      })
-      node.style.transform = 'none'
-      node.style.height = 'auto'
-      node.style.minHeight = 'auto'
-    }
-    node = node.parentElement
-  }
-  return () => {
-    for (const s of saved) {
-      s.el.style.transform = s.transform
-      s.el.style.height = s.height
-      s.el.style.minHeight = s.minHeight
-    }
-  }
 }
 
 function resolveTicketElement(options: {
@@ -76,6 +48,12 @@ function resolveTicketElement(options: {
   return null
 }
 
+function waitForLayoutSettlement(ms = 48): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, ms)))
+  })
+}
+
 async function waitForImages(el: HTMLElement, timeoutMs = 10000): Promise<void> {
   const imgs = Array.from(el.querySelectorAll('img'))
   await Promise.all(
@@ -95,6 +73,75 @@ async function waitForImages(el: HTMLElement, timeoutMs = 10000): Promise<void> 
   )
 }
 
+function readTicketCaptureHeight(ticket: HTMLElement): number {
+  const inline = ticket.style.height
+  if (inline) {
+    const n = parseInt(inline, 10)
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  const h = ticket.offsetHeight
+  if (h > 0) return h
+  return BOLETA_DEFAULT_HEIGHT
+}
+
+/** Clona el ticket fuera de pantalla (sin scale del wrapper) para html2canvas sin deformar flex. */
+function mountTicketClone(source: HTMLElement): { clone: HTMLElement; host: HTMLDivElement } {
+  const captureHeight = readTicketCaptureHeight(source)
+  const clone = source.cloneNode(true) as HTMLElement
+  const host = document.createElement('div')
+  host.setAttribute('aria-hidden', 'true')
+  host.style.cssText = [
+    'position:fixed',
+    'left:-14000px',
+    'top:0',
+    `width:${BOLETA_WIDTH}px`,
+    `height:${captureHeight}px`,
+    'overflow:hidden',
+    'pointer-events:none',
+    'opacity:1',
+    'z-index:-1',
+  ].join(';')
+
+  clone.style.boxSizing = 'border-box'
+  clone.style.display = 'flex'
+  clone.style.flexDirection = 'row'
+  clone.style.width = `${BOLETA_WIDTH}px`
+  clone.style.height = `${captureHeight}px`
+  clone.style.minWidth = `${BOLETA_WIDTH}px`
+  clone.style.maxWidth = `${BOLETA_WIDTH}px`
+  clone.style.overflow = 'hidden'
+  clone.style.transform = 'none'
+  clone.style.position = 'relative'
+
+  const left = clone.querySelector('.boleta-ticket__left') as HTMLElement | null
+  const right = clone.querySelector('.boleta-ticket__right') as HTMLElement | null
+  if (left) {
+    left.style.flexShrink = '0'
+    left.style.width = `${BOLETA_LEFT_WIDTH}px`
+    left.style.height = `${captureHeight}px`
+    left.style.boxSizing = 'border-box'
+    left.style.overflow = 'hidden'
+  }
+  if (right) {
+    right.style.flexShrink = '0'
+    right.style.width = `${BOLETA_RIGHT_WIDTH}px`
+    right.style.height = `${captureHeight}px`
+    right.style.position = 'relative'
+    right.style.overflow = 'hidden'
+    const art = right.querySelector(':scope > img') as HTMLElement | null
+    if (art) {
+      art.style.width = '100%'
+      art.style.height = '100%'
+      art.style.objectFit = 'cover'
+      art.style.display = 'block'
+    }
+  }
+
+  host.appendChild(clone)
+  document.body.appendChild(host)
+  return { clone, host }
+}
+
 export type BoletaImageDelivery = 'save' | 'share'
 
 async function tryShareImageFile(file: File, title: string): Promise<boolean> {
@@ -109,7 +156,6 @@ async function tryShareImageFile(file: File, title: string): Promise<boolean> {
   }
 }
 
-/** En móvil, la hoja de compartir permite «Guardar imagen» en galería (iOS/Android). */
 async function triggerFileDownload(
   blob: Blob,
   fileName: string,
@@ -126,7 +172,6 @@ async function triggerFileDownload(
 
   const url = URL.createObjectURL(blob)
 
-  // iOS: el atributo download no guarda en Fotos; abrir la imagen para «mantener» / compartir.
   if (isIOS() && delivery === 'save') {
     const opened = window.open(url, '_blank', 'noopener,noreferrer')
     if (opened) {
@@ -157,20 +202,14 @@ export async function captureBoletaTicket(
   ticket: HTMLElement,
   scale?: number
 ): Promise<HTMLCanvasElement | null> {
-  const restore = neutraliseAncestorTransforms(ticket)
-  const prevWidth = ticket.style.width
-  const prevHeight = ticket.style.height
-  const prevMinWidth = ticket.style.minWidth
-
-  ticket.style.width = `${BOLETA_WIDTH}px`
-  const captureHeight = ticket.offsetHeight || BOLETA_DEFAULT_HEIGHT
-  ticket.style.height = `${captureHeight}px`
-  ticket.style.minWidth = `${BOLETA_WIDTH}px`
+  const captureHeight = readTicketCaptureHeight(ticket)
+  const { clone, host } = mountTicketClone(ticket)
 
   try {
-    await waitForImages(ticket)
+    await waitForImages(clone)
+    await waitForLayoutSettlement()
     const html2canvas = (await import('html2canvas-pro')).default
-    return await html2canvas(ticket, {
+    return await html2canvas(clone, {
       width: BOLETA_WIDTH,
       height: captureHeight,
       scale: exportScale(scale),
@@ -183,10 +222,7 @@ export async function captureBoletaTicket(
     console.error('Error capturando boleta:', err)
     return null
   } finally {
-    ticket.style.width = prevWidth
-    ticket.style.height = prevHeight
-    ticket.style.minWidth = prevMinWidth
-    restore()
+    host.remove()
   }
 }
 
@@ -216,7 +252,6 @@ export async function downloadBoletaImage(options: {
   selector?: string
   fileName: string
   scale?: number
-  /** save = galería/archivo directo; share = hoja del SO (WhatsApp, etc.) */
   delivery?: BoletaImageDelivery
 }): Promise<boolean> {
   const ticket = resolveTicketElement(options)

@@ -397,6 +397,11 @@ main {
   border-right: 1px solid #111;
   box-sizing: border-box;
   padding: 8px 6px 10px;
+  overflow: hidden;
+}
+
+.boleta-ticket--oficial .boleta-ticket__left > * {
+  flex-shrink: 0;
 }
 
 .boleta-ticket--oficial .boleta-ticket__rules {
@@ -461,6 +466,12 @@ main {
   font-size: 10px;
 }
 
+.boleta-ticket--oficial .boleta-ticket__cliente-direccion {
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
 .boleta-ticket--oficial .boleta-ticket__qr {
   width: 72px;
   height: 72px;
@@ -472,14 +483,16 @@ main {
 }
 
 .boleta-ticket--oficial .boleta-ticket__nota {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.25;
   width: 100%;
   margin: 2px 0 4px;
   text-align: center;
   color: #111;
   word-break: break-word;
+  max-height: 3.6em;
+  overflow: hidden;
 }
 
 .boleta-ticket--oficial .boleta-ticket__numero-grande {

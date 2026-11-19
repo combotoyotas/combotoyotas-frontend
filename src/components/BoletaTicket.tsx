@@ -67,21 +67,21 @@ export default function BoletaTicket(props: BoletaTicketProps) {
   } = props
 
   const [imageError, setImageError] = useState(false)
-  const [ticketHeight, setTicketHeight] = useState(BOLETA_DEFAULT_HEIGHT)
+  const [artHeight, setArtHeight] = useState(BOLETA_DEFAULT_HEIGHT)
   const imagen = getStorageImageUrl(imagenUrl ?? null) ?? imagenUrl
   const hasImagen = Boolean(imagen && imagen.trim())
 
   useEffect(() => {
     if (!hasImagen || !imagen) {
-      setTicketHeight(BOLETA_DEFAULT_HEIGHT)
+      setArtHeight(BOLETA_DEFAULT_HEIGHT)
       return
     }
     const img = new Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => {
-      setTicketHeight(boletaHeightForImage(img.naturalWidth, img.naturalHeight))
+      setArtHeight(boletaHeightForImage(img.naturalWidth, img.naturalHeight))
     }
-    img.onerror = () => setTicketHeight(BOLETA_DEFAULT_HEIGHT)
+    img.onerror = () => setArtHeight(BOLETA_DEFAULT_HEIGHT)
     img.src = imagen
   }, [imagen, hasImagen])
 
@@ -176,9 +176,12 @@ export default function BoletaTicket(props: BoletaTicketProps) {
     barVariant !== 'disponible' &&
     tieneCliente
 
+  const bonoAbonoCount = bonoDetalle.kind === 'abonos' ? bonoDetalle.lineas.length : 0
+
+  const ticketHeight = Math.max(artHeight, BOLETA_DEFAULT_HEIGHT)
+
   const bonoBandPx = bonoFooterHeightPx(ticketHeight)
   const bonoFooterEm = Math.max(9, Math.round(bonoBandPx * 0.2))
-  const bonoAbonoCount = bonoDetalle.kind === 'abonos' ? bonoDetalle.lineas.length : 0
   const bonoAbonoLinePx =
     bonoAbonoCount > 0 ? bonoAbonoLineFontPx(bonoBandPx, bonoAbonoCount) : 0
   const bonoAbonoGapPx = bonoAbonoCount > 0 ? bonoAbonoLinesGapPx(bonoAbonoCount) : 0
@@ -233,7 +236,9 @@ export default function BoletaTicket(props: BoletaTicketProps) {
             <p>A nombre de:</p>
             <p className="boleta-ticket__cliente-name">{clienteInfo?.nombre ?? '—'}</p>
             {!hideIdentificacion && (
-              <p>{(clienteInfo?.direccion ?? '').trim() || '—'}</p>
+              <p className="boleta-ticket__cliente-direccion">
+                {(clienteInfo?.direccion ?? '').trim() || '—'}
+              </p>
             )}
           </div>
         )}
@@ -271,7 +276,7 @@ export default function BoletaTicket(props: BoletaTicketProps) {
             onLoad={(e) => {
               const img = e.currentTarget
               if (img.naturalWidth > 0) {
-                setTicketHeight(boletaHeightForImage(img.naturalWidth, img.naturalHeight))
+                setArtHeight(boletaHeightForImage(img.naturalWidth, img.naturalHeight))
               }
             }}
             onError={() => setImageError(true)}
