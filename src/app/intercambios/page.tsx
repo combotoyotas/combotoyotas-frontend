@@ -503,20 +503,20 @@ export default function IntercambiosPage() {
           }`}
         >
           <p className="font-semibold">
-            Intercambios aceptados:{' '}
+            Solicitudes enviadas y aceptadas:{' '}
             <span className="font-mono">
               {ctx.cuota_intercambios.aceptados}/{ctx.cuota_intercambios.limite}
             </span>
           </p>
           <p className="text-xs mt-1 text-slate-600">
-            Solo cuentan intercambios <strong>aceptados</strong> desde la activación del límite (
-            {esOficina ? 'cuota compartida de oficina' : 'tu cupo personal'}). Los anteriores no
-            consumen cupo.
+            El límite aplica solo al <strong>enviar</strong> solicitudes (
+            {esOficina ? 'cuota compartida de oficina' : 'tu cupo como solicitante'}) desde la
+            activación del tope. <strong>Recibir y aceptar</strong> no consume cupo.
           </p>
           {!ctx.cuota_intercambios.puede_solicitar && (
             <p className="text-xs mt-2 font-medium text-amber-900">
-              Límite alcanzado: no puedes crear nuevas solicitudes hasta que el cupo se libere en el
-              futuro.
+              Límite de envío alcanzado: no puedes crear nuevas solicitudes. Puedes seguir
+              aprobando las que te lleguen.
             </p>
           )}
         </div>
