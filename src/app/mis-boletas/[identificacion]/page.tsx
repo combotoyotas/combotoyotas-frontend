@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import BoletaTicket from '@/components/BoletaTicket'
 import ResponsiveBoletaWrapper from '@/components/ResponsiveBoletaWrapper'
 import { downloadBoletaImage } from '@/utils/downloadBoletaImage'
+import { buildClienteInfoForTicket } from '@/lib/boletaClienteInfo'
 
 interface BoletaData {
   id: string
@@ -36,6 +37,7 @@ interface ClienteData {
   telefono: string
   identificacion: string
   email?: string | null
+  direccion?: string | null
 }
 
 interface ApiResponse {
@@ -61,6 +63,8 @@ export default function MisBoletasPage() {
   const [rifas, setRifas] = useState<RifaGroup[]>([])
   const [totalBoletas, setTotalBoletas] = useState(0)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+
+  const clienteInfoBoleta = buildClienteInfoForTicket(cliente)
 
   useEffect(() => {
     const fetchBoletas = async () => {
@@ -234,10 +238,7 @@ export default function MisBoletasPage() {
                           imagenUrl={boleta.imagen_url}
                           rifaNombre={rifa.rifa_nombre}
                           estado={boleta.estado}
-                          clienteInfo={cliente ? {
-                            nombre: cliente.nombre,
-                            identificacion: cliente.identificacion
-                          } : null}
+                          clienteInfo={clienteInfoBoleta}
                           deuda={boleta.saldo_pendiente > 0 ? boleta.saldo_pendiente : null}
                           reservadaHasta={boleta.bloqueo_hasta}
                           precio={boleta.precio_boleta}

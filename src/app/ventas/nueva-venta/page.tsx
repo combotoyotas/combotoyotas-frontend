@@ -693,6 +693,7 @@ function VentasPageContent() {
                 <ClienteSeleccionado
                   cliente={cliente}
                   onCambiarCliente={() => setPasoActual('datos-cliente')}
+                  onActualizarCliente={(patch) => setCliente((c) => ({ ...c, ...patch }))}
                 />
                 
                 <CarritoVentas

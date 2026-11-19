@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { ventasApi } from '@/lib/ventasApi'
 import { BoletaEnCarrito, Cliente, VentaRequest } from '@/types/ventas'
@@ -19,6 +19,7 @@ import { ajustesApi, type LineaVentaItem, type MedioPagoItem } from '@/lib/ajust
 import { TokenManager } from '@/utils/auth'
 import VentasMobileActionBar, { type VentasMobileAction } from '@/components/ventas/VentasMobileActionBar'
 import VentasCenteredOverlay from '@/components/ventas/VentasCenteredOverlay'
+import { buildClienteInfoForTicket } from '@/lib/boletaClienteInfo'
 
 const MEDIOS_PAGO_MAP: Record<string, string> = {
   'd397d917-c0d0-4c61-b2b3-2ebfab7deeb7': 'Efectivo',
@@ -105,6 +106,17 @@ export default function CarritoVentas({
   const montoAbono = tipoVenta === 'ABONO' ? Object.values(abonosPorBoleta).reduce((sum, v) => sum + (v || 0), 0) : 0
   const saldoPendiente = tipoVenta === 'ABONO' ? total - montoAbono : 0
   const tipoVentaSeleccionado = tipoVenta !== null
+
+  const clienteInfoBoleta = useMemo(
+    () =>
+      buildClienteInfoForTicket(cliente, ventaResponse?.cliente, {
+        nombre: ventaResponse?.cliente_nombre ?? cliente?.nombre,
+        cliente_direccion:
+          ventaResponse?.cliente_direccion ?? ventaResponse?.cliente?.direccion,
+        direccion: cliente?.direccion,
+      }),
+    [cliente, ventaResponse]
+  )
 
   const reservaDeshabilitada =
     procesando ||
@@ -557,11 +569,7 @@ export default function CarritoVentas({
                           : 'ABONADA'
                         : 'CON_PAGO'
                   }
-                  clienteInfo={{
-                    nombre: cliente.nombre,
-                    identificacion: cliente.identificacion,
-                    direccion: cliente.direccion,
-                  }}
+                  clienteInfo={clienteInfoBoleta}
                   deuda={
                     tipoVenta === 'RESERVA'
                       ? precioBoleta
@@ -1112,9 +1120,24 @@ export default function CarritoVentas({
               imagen_url: b.imagen_url ?? local?.imagen_url,
             }
           })
+          const ciudadReserva =
+            data.cliente_direccion ??
+            data.cliente?.direccion ??
+            cliente.direccion ??
+            null
           setVentaResponse({
             ...data,
             boletas: boletasMerged,
+            cliente_direccion: ciudadReserva,
+            cliente: data.cliente
+              ? { ...data.cliente, direccion: data.cliente.direccion ?? ciudadReserva }
+              : ciudadReserva
+                ? {
+                    nombre: data.cliente_nombre ?? cliente.nombre,
+                    identificacion: cliente.identificacion,
+                    direccion: ciudadReserva,
+                  }
+                : data.cliente,
           })
           setTipoVenta('RESERVA')
           setPaso('completado')

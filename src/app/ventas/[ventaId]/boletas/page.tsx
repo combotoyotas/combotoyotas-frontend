@@ -9,6 +9,7 @@ import BoletaTicket from '@/components/BoletaTicket'
 import ResponsiveBoletaWrapper from '@/components/ResponsiveBoletaWrapper'
 import { downloadBoletaImage } from '@/utils/downloadBoletaImage'
 import { formatBoletaNumeros, normalizeNumeros } from '@/utils/formatBoletaNumeros'
+import { buildClienteInfoForTicket } from '@/lib/boletaClienteInfo'
 
 interface AbonoBoletaInfo {
   id?: string
@@ -39,7 +40,7 @@ export default function VentasBoletasPage() {
   const [error, setError] = useState<string | null>(null)
   const [clienteNombre, setClienteNombre] = useState('')
   const [clienteIdentificacion, setClienteIdentificacion] = useState('')
-  const [clienteDireccion, setClienteDireccion] = useState('')
+  const [clienteDireccion, setClienteDireccion] = useState<string | null>(null)
   const [rifaNombre, setRifaNombre] = useState('')
   const [boletas, setBoletas] = useState<BoletaInfo[]>([])
   const [estadoVenta, setEstadoVenta] = useState('')
@@ -62,7 +63,7 @@ export default function VentasBoletasPage() {
       const data = response.data as any
       setClienteNombre(data.cliente_nombre ?? data.nombre ?? 'Cliente')
       setClienteIdentificacion(data.cliente_identificacion ?? data.identificacion ?? '')
-      setClienteDireccion(String(data.cliente_direccion ?? data.direccion ?? '').trim())
+      setClienteDireccion(data.cliente_direccion ?? data.cliente?.direccion ?? null)
       setRifaNombre(data.rifa_nombre ?? '')
       setBoletas(data.boletas ?? [])
       setEstadoVenta(data.estado_venta ?? '')
@@ -91,6 +92,13 @@ export default function VentasBoletasPage() {
       await new Promise(r => setTimeout(r, 500))
     }
   }, [boletas, descargarBoleta])
+
+  const clienteInfoBoleta = buildClienteInfoForTicket({
+    nombre: clienteNombre,
+    identificacion: clienteIdentificacion,
+    cliente_direccion: clienteDireccion,
+    direccion: clienteDireccion,
+  })
 
   if (loading) {
     return (
@@ -196,11 +204,7 @@ export default function VentasBoletasPage() {
                       imagenUrl={boleta.imagen_url}
                       rifaNombre={rifaNombre}
                       estado={boleta.estado}
-                      clienteInfo={{
-                        nombre: clienteNombre,
-                        identificacion: clienteIdentificacion,
-                        direccion: clienteDireccion || null,
-                      }}
+                      clienteInfo={clienteInfoBoleta}
                       deuda={boleta.saldo_pendiente_boleta}
                       precio={boleta.precio_boleta}
                       nota={boleta.nota}

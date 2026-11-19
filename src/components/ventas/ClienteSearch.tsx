@@ -212,7 +212,10 @@ export default function ClienteSearch({
 
       // Llamar al callback con el cliente creado
       // Seleccionar automáticamente el cliente recién creado
-      onClienteSelected(nuevoCliente)
+      onClienteSelected({
+        ...nuevoCliente,
+        direccion: nuevoCliente.direccion?.trim() || payload.direccion || undefined,
+      })
 
     //   // Notificar creación si existe callback
     //   if (onClienteCreated) {

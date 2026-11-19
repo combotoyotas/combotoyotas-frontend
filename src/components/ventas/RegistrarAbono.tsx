@@ -17,6 +17,7 @@ import { formatRegistradoConRol } from '@/utils/formatAbonoRegistradoPor'
 import { ajustesApi, type LineaVentaItem, type MedioPagoItem } from '@/lib/ajustesApi'
 import { TokenManager } from '@/utils/auth'
 import VentasMobileActionBar from '@/components/ventas/VentasMobileActionBar'
+import { buildClienteInfoForTicket } from '@/lib/boletaClienteInfo'
 
 interface Props {
   ventaId: string
@@ -502,6 +503,18 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
     }
   }
 
+  const clienteInfoBoleta =
+    venta != null
+      ? buildClienteInfoForTicket(
+          {
+            nombre: venta.nombre,
+            identificacion: venta.cliente_identificacion,
+            cliente_direccion: venta.cliente_direccion,
+          },
+          { nombre: venta.nombre, direccion: venta.cliente_direccion }
+        )
+      : null
+
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-8 text-center">
@@ -637,11 +650,7 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
                       imagenUrl={b.imagen_url}
                       rifaNombre={venta.rifa_nombre || ''}
                       estado={estadoBoletaTicket(b)}
-                      clienteInfo={{
-                        nombre: venta.nombre,
-                        identificacion: venta.cliente_identificacion,
-                        direccion: venta.cliente_direccion,
-                      }}
+                      clienteInfo={clienteInfoBoleta}
                       deuda={b.saldo_pendiente_boleta ?? 0}
                       reservadaHasta={b.bloqueo_hasta}
                       precio={b.precio_boleta ?? null}

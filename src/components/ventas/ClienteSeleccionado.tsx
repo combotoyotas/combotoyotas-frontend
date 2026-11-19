@@ -5,9 +5,14 @@ import { Cliente } from '@/types/ventas'
 interface ClienteSeleccionadoProps {
   cliente: Cliente
   onCambiarCliente?: () => void
+  onActualizarCliente?: (patch: Partial<Cliente>) => void
 }
 
-export default function ClienteSeleccionado({ cliente, onCambiarCliente }: ClienteSeleccionadoProps) {
+export default function ClienteSeleccionado({
+  cliente,
+  onCambiarCliente,
+  onActualizarCliente,
+}: ClienteSeleccionadoProps) {
   // Validación de seguridad - verificar que el cliente exista y tenga nombre no vacío
   if (!cliente || !cliente.nombre || cliente.nombre.trim() === '') {
     return (
@@ -70,15 +75,31 @@ export default function ClienteSeleccionado({ cliente, onCambiarCliente }: Clien
           </div>
         )}
         
-        {cliente.direccion && (
-          <div className="flex items-center space-x-2 text-sm text-slate-600">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span>{cliente.direccion}</span>
-          </div>
-        )}
+        <div className="pt-1">
+          <label className="block text-sm font-medium text-slate-800 mb-1.5">
+            Ciudad / municipio{' '}
+            <span className="text-slate-400 font-normal">(aparece en la boleta)</span>
+          </label>
+          {onActualizarCliente ? (
+            <textarea
+              value={cliente.direccion ?? ''}
+              onChange={(e) => onActualizarCliente({ direccion: e.target.value })}
+              rows={2}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              placeholder="Ej: Pereira, Dosquebradas..."
+            />
+          ) : cliente.direccion ? (
+            <div className="flex items-start space-x-2 text-sm text-slate-600">
+              <svg className="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>{cliente.direccion}</span>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400">Sin ciudad registrada</p>
+          )}
+        </div>
       </div>
     </div>
   )

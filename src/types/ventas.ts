@@ -204,18 +204,31 @@ export interface BolataReservada {
   imagen_url?: string | null
 }
 
+export interface ClienteVentaSnapshot {
+  id?: string
+  nombre?: string
+  telefono?: string
+  email?: string | null
+  identificacion?: string | null
+  direccion?: string | null
+}
+
 export interface ReservaResponse {
   reserva_id: string
   tipo: 'RESERVA_FORMAL'
-  rifa_titulo: string
+  rifa_titulo?: string
+  rifa_nombre?: string
   cantidad_boletas: number
-  dias_bloqueo: number
+  dias_bloqueo?: number
   bloqueo_hasta: string
   estado_venta: 'PENDIENTE'
   monto_total: number
   boletas_reservadas: BolataReservada[]
+  boletas?: BolataReservada[]
   cliente_id?: string
+  cliente?: ClienteVentaSnapshot | null
   cliente_nombre?: string
+  cliente_direccion?: string | null
   created_at?: string
 }
 
