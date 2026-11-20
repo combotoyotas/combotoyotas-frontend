@@ -65,7 +65,13 @@ const MODULE_ICONS: Record<string, ComponentType<{ className?: string }>> = {
 }
 
 interface AppSidebarProps {
-  user: { nombre: string; rol: string; email?: string } | null
+  user: {
+    nombre: string
+    rol: string
+    email?: string
+    pagina_web_habilitada?: boolean
+    pagina_web_slug?: string | null
+  } | null
   mobileOpen: boolean
   onMobileClose: () => void
   /** Si es true, el menú solo aparece como overlay (p. ej. en Inicio). */

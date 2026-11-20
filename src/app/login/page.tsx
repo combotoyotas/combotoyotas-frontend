@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { API_BASE_URL } from '@/config/api'
+import { syncVendedorPaginaSession } from '@/lib/syncVendedorPaginaSession'
 import { TokenManager } from '@/utils/auth'
 import InstalarAppButton from '@/components/pwa/InstalarAppButton'
 import BrandLogo from '@/components/brand/BrandLogo'
@@ -111,7 +112,11 @@ export default function LoginPage() {
 
       if (data.success) {
         TokenManager.saveAuthData(data.data!.token, data.data!.user)
-        setWelcomeUser(data.data!.user)
+        if (String(data.data!.user.rol).toUpperCase() === 'VENDEDOR') {
+          await syncVendedorPaginaSession()
+        }
+        const freshUser = TokenManager.getUser()
+        setWelcomeUser(freshUser || data.data!.user)
         setCountdown(3)
       } else if (data.error === 'Validation Error' && data.details) {
         setError(data.details.map((detail) => detail.message).join(', '))

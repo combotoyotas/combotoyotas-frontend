@@ -12,18 +12,11 @@ import {
   shouldShowSidebar,
   shouldShowTabBar,
 } from '@/config/modules'
-
-interface StoredUser {
-  id: string
-  email: string
-  nombre: string
-  rol: string
-  pagina_web_habilitada?: boolean
-}
+import { syncVendedorPaginaSession, type SessionUser } from '@/lib/syncVendedorPaginaSession'
 
 export default function ModuleShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || '/'
-  const [user, setUser] = useState<StoredUser | null>(null)
+  const [user, setUser] = useState<SessionUser | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const showSidebar = shouldShowSidebar(pathname)
@@ -34,15 +27,30 @@ export default function ModuleShell({ children }: { children: React.ReactNode })
   }, [pathname])
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('user')
-      if (raw) {
-        setUser(JSON.parse(raw))
-      } else {
-        setUser(null)
+    let cancelled = false
+    const loadUser = async () => {
+      try {
+        const raw = localStorage.getItem('user')
+        if (!raw) {
+          if (!cancelled) setUser(null)
+          return
+        }
+        let parsed = JSON.parse(raw) as SessionUser
+        if (String(parsed.rol).toUpperCase() === 'VENDEDOR') {
+          const synced = await syncVendedorPaginaSession()
+          if (synced) parsed = synced
+        }
+        if (!cancelled) setUser(parsed)
+      } catch {
+        if (!cancelled) setUser(null)
       }
-    } catch {
-      setUser(null)
+    }
+    void loadUser()
+    const onFocus = () => void loadUser()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      cancelled = true
+      window.removeEventListener('focus', onFocus)
     }
   }, [pathname])
 

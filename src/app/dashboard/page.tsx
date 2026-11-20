@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import VentasOnlineBanner from '@/components/ventasPublicas/VentasOnlineBanner'
 import { resolveVentasEntryHref } from '@/lib/ventasNavigation'
 import { BRAND_SHORT } from '@/config/brand'
-import { paginasWebApi } from '@/lib/paginasWebApi'
+import { syncVendedorPaginaSession } from '@/lib/syncVendedorPaginaSession'
 import { TokenManager } from '@/utils/auth'
 
 interface User {
@@ -53,15 +53,8 @@ export default function DashboardPage() {
       setUser(parsedUser)
 
       if (String(parsedUser.rol).toUpperCase() === 'VENDEDOR') {
-        void paginasWebApi.miPagina().then((res) => {
-          if (!res?.success || !res.data) return
-          const merged: User = {
-            ...parsedUser,
-            pagina_web_habilitada: Boolean(res.data.habilitada),
-            pagina_web_slug: res.data.slug ?? null,
-          }
-          TokenManager.saveAuthData(token, merged)
-          setUser(merged)
+        void syncVendedorPaginaSession().then((merged) => {
+          if (merged) setUser({ ...parsedUser, ...merged })
         })
       }
     } catch (error) {
