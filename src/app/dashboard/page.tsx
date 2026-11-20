@@ -53,7 +53,7 @@ export default function DashboardPage() {
     try {
       const parsedUser = JSON.parse(userData) as User
       if (String(parsedUser.rol).toUpperCase() === 'VENDEDOR') {
-        const merged = await syncVendedorPaginaSession()
+        const merged = await syncVendedorPaginaSession({ force: true })
         setUser(merged ? { ...parsedUser, ...merged } : parsedUser)
       } else {
         setUser(parsedUser)
@@ -71,7 +71,7 @@ export default function DashboardPage() {
   }
   window.addEventListener(SESSION_USER_UPDATED, onSession)
   const onFocus = () => {
-    void syncVendedorPaginaSession().then((merged) => {
+    void syncVendedorPaginaSession({ force: false }).then((merged) => {
       if (merged) setUser(merged as User)
     })
   }

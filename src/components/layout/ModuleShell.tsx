@@ -29,8 +29,18 @@ export default function ModuleShell({ children }: { children: React.ReactNode })
   }, [pathname])
 
   useEffect(() => {
+    let parsed = TokenManager.getUser() as SessionUser | null
+    setUser(parsed)
+  }, [])
+
+  useEffect(() => {
     let cancelled = false
-    const loadUser = async () => {
+    const loadUserFromStorage = () => {
+      const parsed = TokenManager.getUser() as SessionUser | null
+      if (!cancelled) setUser(parsed)
+    }
+
+    const syncVendedor = async (force = false) => {
       try {
         let parsed = TokenManager.getUser() as SessionUser | null
         if (!parsed) {
@@ -38,18 +48,19 @@ export default function ModuleShell({ children }: { children: React.ReactNode })
           return
         }
         if (String(parsed.rol).toUpperCase() === 'VENDEDOR') {
-          const synced = await syncVendedorPaginaSession()
+          const synced = await syncVendedorPaginaSession({ force })
           if (synced) parsed = synced
-          else parsed = (TokenManager.getUser() as SessionUser) || parsed
         }
         if (!cancelled) setUser(parsed)
       } catch {
-        if (!cancelled) setUser(null)
+        if (!cancelled) loadUserFromStorage()
       }
     }
-    void loadUser()
-    const onFocus = () => void loadUser()
-    const onSessionUser = () => void loadUser()
+
+    void syncVendedor(true)
+
+    const onFocus = () => void syncVendedor(false)
+    const onSessionUser = () => loadUserFromStorage()
     window.addEventListener('focus', onFocus)
     window.addEventListener(SESSION_USER_UPDATED, onSessionUser)
     return () => {
@@ -57,7 +68,7 @@ export default function ModuleShell({ children }: { children: React.ReactNode })
       window.removeEventListener('focus', onFocus)
       window.removeEventListener(SESSION_USER_UPDATED, onSessionUser)
     }
-  }, [pathname])
+  }, [])
 
   const role = normalizeRole(user?.rol)
   const activeModule = getActiveModule(pathname, role, user)

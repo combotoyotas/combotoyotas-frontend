@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { API_BASE_URL } from '@/config/api'
 
-const POLL_MS = 8000
+const POLL_MS = 45_000
 
 /**
  * Guard global: cuando no hay proyecto ACTIVA (solo PAUSADA), bloquea

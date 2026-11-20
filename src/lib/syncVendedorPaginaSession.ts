@@ -31,12 +31,24 @@ function persistSessionUser(token: string, merged: SessionUser): SessionUser {
   return merged
 }
 
+let lastSyncAt = 0
+const SYNC_MIN_INTERVAL_MS = 60_000
+
 /** Actualiza localStorage con el estado real de la página web (tras habilitar en super admin). */
-export async function syncVendedorPaginaSession(): Promise<SessionUser | null> {
+export async function syncVendedorPaginaSession(
+  options?: { force?: boolean }
+): Promise<SessionUser | null> {
   const token = TokenManager.getToken()
   const user = TokenManager.getUser() as SessionUser | null
   if (!token || !user) return null
   if (String(user.rol).toUpperCase() !== 'VENDEDOR') return user
+
+  const now = Date.now()
+  if (!options?.force && now - lastSyncAt < SYNC_MIN_INTERVAL_MS) {
+    return user
+  }
+  lastSyncAt = now
+
   try {
     const fresh = await fetchSessionUserFromApi(token)
     if (fresh) {

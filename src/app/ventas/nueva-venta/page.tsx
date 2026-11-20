@@ -166,7 +166,13 @@ function VentasPageContent() {
       
     } catch (error) {
       console.error('Error general en cargarRifas:', error)
-      setError('Error cargando proyectos activos')
+      const msg =
+        error instanceof Error ? error.message : 'Error cargando proyectos activos'
+      setError(
+        msg.includes('Demasiadas peticiones')
+          ? msg
+          : 'Error cargando proyectos activos. Revisa tu conexión o espera un momento y recarga.'
+      )
     } finally {
       setLoading(false)
     }

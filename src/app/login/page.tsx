@@ -113,7 +113,7 @@ export default function LoginPage() {
       if (data.success) {
         TokenManager.saveAuthData(data.data!.token, data.data!.user)
         if (String(data.data!.user.rol).toUpperCase() === 'VENDEDOR') {
-          await syncVendedorPaginaSession()
+          await syncVendedorPaginaSession({ force: true })
         }
         const freshUser = TokenManager.getUser()
         setWelcomeUser(freshUser || data.data!.user)

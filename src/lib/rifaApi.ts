@@ -25,6 +25,11 @@ class RifaApiService {
     const data = await response.json()
     
     if (!response.ok) {
+      if (response.status === 429) {
+        throw new Error(
+          'Demasiadas peticiones. Espera 1–2 minutos e intenta de nuevo (si comparten internet con otros vendedores, es normal).'
+        )
+      }
       if (response.status === 401 || response.status === 403) {
         const msg = String(data.message || '').toLowerCase()
         if (
