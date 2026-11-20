@@ -1,35 +1,37 @@
-// Configuración de medios de pago — Combo Toyotas (única cuenta para todos los roles)
+// Medios de pago públicos — Inversiones Castaño (alineado con landing)
 
 import { COMBOTOYOTAS_CONTACT } from '@/config/combotoyotasContact'
-import { BRAND_NAME } from '@/config/brand'
 
 interface PaymentInfo {
-  llave: string | null
+  nequi: string
   cuentaBancolombia: string
   titular: string
+  promotora: string
   whatsapp: string | null
 }
 
-const COMBOTOYOTAS_PAYMENT: PaymentInfo = {
-  llave: COMBOTOYOTAS_CONTACT.llaveBreve,
+const PAYMENT: PaymentInfo = {
+  nequi: COMBOTOYOTAS_CONTACT.nequi,
   cuentaBancolombia: COMBOTOYOTAS_CONTACT.cuentaBancolombia,
-  titular: COMBOTOYOTAS_CONTACT.titular,
+  titular: COMBOTOYOTAS_CONTACT.titularCuenta,
+  promotora: COMBOTOYOTAS_CONTACT.promotora,
   whatsapp: COMBOTOYOTAS_CONTACT.whatsappDisplay.replace(/\s/g, ''),
 }
 
 export function getPaymentInfo(): PaymentInfo {
-  return COMBOTOYOTAS_PAYMENT
+  return PAYMENT
 }
 
 /**
- * Genera el bloque de texto de medios de pago para mensajes de WhatsApp.
+ * Bloque de medios de pago para mensajes de WhatsApp (reservas, saldos, recordatorios).
  */
 export function getMediosDePagoTexto(): string {
-  let texto = `*Cómo pagar (${BRAND_NAME})*\n`
-  texto += `💰 Llave Bre-B: ${COMBOTOYOTAS_CONTACT.llaveBreve}\n`
-  texto += `💰 Cuenta de ahorros Bancolombia: ${COMBOTOYOTAS_CONTACT.cuentaBancolombia}\n`
-  texto += `${COMBOTOYOTAS_CONTACT.titular}\n`
-  texto += `📲 WhatsApp: ${COMBOTOYOTAS_CONTACT.whatsappDisplay}\n`
+  const c = COMBOTOYOTAS_CONTACT
+  let texto = `*Cómo pagar (${c.promotora})*\n`
+  texto += `📱 ${c.nequiLabel}: ${c.nequi}\n`
+  texto += `💰 ${c.bancoLabel}: ${c.cuentaBancolombia}\n`
+  texto += `${c.titularCuenta}\n`
+  texto += `📲 WhatsApp: ${c.whatsappDisplay}\n`
   texto += `\n*Importante: envía comprobante de pago una vez realizada la transferencia* ✅`
   return texto
 }

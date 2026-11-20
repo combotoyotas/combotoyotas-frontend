@@ -1,5 +1,5 @@
 /**
- * Mensajes de WhatsApp para clientes — tono humano, marca Combo Toyotas.
+ * Mensajes de WhatsApp para clientes — tono humano, marca Combo Toyotas; cobros Inversiones Castaño.
  */
 import { formatBoletaNumeros } from '@/utils/formatBoletaNumeros'
 import { getMediosDePagoTexto } from '@/config/paymentInfo'
