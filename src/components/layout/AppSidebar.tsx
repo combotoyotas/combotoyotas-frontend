@@ -36,6 +36,7 @@ import { clearModuleLastPaths } from '@/lib/moduleLastPath'
 import { resolveVentasEntryHref } from '@/lib/ventasNavigation'
 import { resolveModuleNavHref } from '@/lib/moduleSessionCache'
 import { TokenManager } from '@/utils/auth'
+import type { SessionUser } from '@/lib/syncVendedorPaginaSession'
 import BrandLogo from '@/components/brand/BrandLogo'
 import { BRAND_NAME } from '@/config/brand'
 
@@ -65,13 +66,7 @@ const MODULE_ICONS: Record<string, ComponentType<{ className?: string }>> = {
 }
 
 interface AppSidebarProps {
-  user: {
-    nombre: string
-    rol: string
-    email?: string
-    pagina_web_habilitada?: boolean
-    pagina_web_slug?: string | null
-  } | null
+  user: SessionUser | null
   mobileOpen: boolean
   onMobileClose: () => void
   /** Si es true, el menú solo aparece como overlay (p. ej. en Inicio). */
@@ -193,7 +188,7 @@ function SidebarContent({
               {user.nombre?.charAt(0)?.toUpperCase() || 'U'}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-slate-800">{user.nombre}</p>
+              <p className="truncate text-sm font-medium text-slate-800">{user.nombre ?? 'Usuario'}</p>
               <p className="truncate text-[11px] text-slate-400">
                 {role ? roleLabel[role] : user.rol}
               </p>
