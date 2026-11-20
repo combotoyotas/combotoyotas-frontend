@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { paginasWebApi, type PaginaContactoItem } from '@/lib/paginasWebApi'
 import ReservasPaginaTable, { type ReservaPaginaRow } from '@/components/pagina-web/ReservasPaginaTable'
+import { syncVendedorPaginaSession } from '@/lib/syncVendedorPaginaSession'
 import { TokenManager } from '@/utils/auth'
 import { useRouter } from 'next/navigation'
 
@@ -43,12 +44,19 @@ export default function MiPaginaWebPage() {
 
   useEffect(() => {
     ;(async () => {
-      const user = TokenManager.getUser()
+      const synced = await syncVendedorPaginaSession()
+      const user = synced || TokenManager.getUser()
       if (String(user?.rol).toUpperCase() !== 'VENDEDOR') {
         router.replace('/dashboard')
         return
       }
-      if (!user?.pagina_web_habilitada) {
+      let habilitada = Boolean(user?.pagina_web_habilitada)
+      if (!habilitada) {
+        const res = await paginasWebApi.miPagina()
+        habilitada = Boolean(res.success && res.data?.habilitada)
+        if (habilitada) await syncVendedorPaginaSession()
+      }
+      if (!habilitada) {
         setError('Tu página web no está habilitada. Contacta al super administrador.')
         setLoading(false)
         return

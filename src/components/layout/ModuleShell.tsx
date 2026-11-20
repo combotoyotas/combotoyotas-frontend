@@ -12,7 +12,9 @@ import {
   shouldShowSidebar,
   shouldShowTabBar,
 } from '@/config/modules'
+import { SESSION_USER_UPDATED } from '@/config/api'
 import { syncVendedorPaginaSession, type SessionUser } from '@/lib/syncVendedorPaginaSession'
+import { TokenManager } from '@/utils/auth'
 
 export default function ModuleShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || '/'
@@ -30,15 +32,15 @@ export default function ModuleShell({ children }: { children: React.ReactNode })
     let cancelled = false
     const loadUser = async () => {
       try {
-        const raw = localStorage.getItem('user')
-        if (!raw) {
+        let parsed = TokenManager.getUser() as SessionUser | null
+        if (!parsed) {
           if (!cancelled) setUser(null)
           return
         }
-        let parsed = JSON.parse(raw) as SessionUser
         if (String(parsed.rol).toUpperCase() === 'VENDEDOR') {
           const synced = await syncVendedorPaginaSession()
           if (synced) parsed = synced
+          else parsed = (TokenManager.getUser() as SessionUser) || parsed
         }
         if (!cancelled) setUser(parsed)
       } catch {
@@ -47,10 +49,13 @@ export default function ModuleShell({ children }: { children: React.ReactNode })
     }
     void loadUser()
     const onFocus = () => void loadUser()
+    const onSessionUser = () => void loadUser()
     window.addEventListener('focus', onFocus)
+    window.addEventListener(SESSION_USER_UPDATED, onSessionUser)
     return () => {
       cancelled = true
       window.removeEventListener('focus', onFocus)
+      window.removeEventListener(SESSION_USER_UPDATED, onSessionUser)
     }
   }, [pathname])
 

@@ -1,3 +1,4 @@
+import { SESSION_USER_UPDATED } from '@/config/api'
 import { paginasWebApi } from '@/lib/paginasWebApi'
 import { TokenManager } from '@/utils/auth'
 
@@ -25,6 +26,9 @@ export async function syncVendedorPaginaSession(): Promise<SessionUser | null> {
       pagina_web_slug: res.data?.slug ?? null,
     }
     TokenManager.saveAuthData(token, merged)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(SESSION_USER_UPDATED))
+    }
     return merged
   } catch {
     return user

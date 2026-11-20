@@ -1,6 +1,5 @@
+import { BACKEND_API_ROOT } from '@/config/api'
 import { TokenManager } from '@/utils/auth'
-
-const base = () => process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'
 
 function authHeaders(): HeadersInit {
   const token = TokenManager.getToken()
@@ -49,14 +48,14 @@ export type PaginaContactoItem = {
 
 export const paginasWebApi = {
   async listVendedores() {
-    const res = await fetch(`${base()}/paginas-web/admin/vendedores`, {
+    const res = await fetch(`${BACKEND_API_ROOT}/paginas-web/admin/vendedores`, {
       headers: authHeaders(),
     })
     return parseAuthJson(res)
   },
 
   async configurar(vendedorId: string, habilitada: boolean, slug: string) {
-    const res = await fetch(`${base()}/paginas-web/admin/vendedores/${vendedorId}`, {
+    const res = await fetch(`${BACKEND_API_ROOT}/paginas-web/admin/vendedores/${vendedorId}`, {
       method: 'PATCH',
       headers: authHeaders(),
       body: JSON.stringify({ habilitada, slug }),
@@ -65,17 +64,17 @@ export const paginasWebApi = {
   },
 
   async miPagina() {
-    const res = await fetch(`${base()}/paginas-web/mi`, { headers: authHeaders() })
+    const res = await fetch(`${BACKEND_API_ROOT}/paginas-web/mi`, { headers: authHeaders() })
     return parseAuthJson(res)
   },
 
   async misReservas() {
-    const res = await fetch(`${base()}/paginas-web/mi/reservas`, { headers: authHeaders() })
+    const res = await fetch(`${BACKEND_API_ROOT}/paginas-web/mi/reservas`, { headers: authHeaders() })
     return parseAuthJson(res)
   },
 
   async getContactoPagina() {
-    const res = await fetch(`${base()}/paginas-web/mi/contacto`, { headers: authHeaders() })
+    const res = await fetch(`${BACKEND_API_ROOT}/paginas-web/mi/contacto`, { headers: authHeaders() })
     return parseAuthJson(res)
   },
 
@@ -85,7 +84,7 @@ export const paginasWebApi = {
     valor: string
     activo?: boolean
   }) {
-    const res = await fetch(`${base()}/paginas-web/mi/contacto/medios-pago`, {
+    const res = await fetch(`${BACKEND_API_ROOT}/paginas-web/mi/contacto/medios-pago`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(body),
@@ -99,7 +98,7 @@ export const paginasWebApi = {
     valor: string
     activo?: boolean
   }) {
-    const res = await fetch(`${base()}/paginas-web/mi/contacto/lineas-whatsapp`, {
+    const res = await fetch(`${BACKEND_API_ROOT}/paginas-web/mi/contacto/lineas-whatsapp`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(body),
@@ -108,7 +107,7 @@ export const paginasWebApi = {
   },
 
   async deleteMedioPagina(id: string) {
-    const res = await fetch(`${base()}/paginas-web/mi/contacto/medios-pago/${id}`, {
+    const res = await fetch(`${BACKEND_API_ROOT}/paginas-web/mi/contacto/medios-pago/${id}`, {
       method: 'DELETE',
       headers: authHeaders(),
     })
@@ -116,7 +115,7 @@ export const paginasWebApi = {
   },
 
   async deleteLineaWhatsApp(id: string) {
-    const res = await fetch(`${base()}/paginas-web/mi/contacto/lineas-whatsapp/${id}`, {
+    const res = await fetch(`${BACKEND_API_ROOT}/paginas-web/mi/contacto/lineas-whatsapp/${id}`, {
       method: 'DELETE',
       headers: authHeaders(),
     })
@@ -124,7 +123,7 @@ export const paginasWebApi = {
   },
 
   async savePlantillaContacto(plantilla: string) {
-    const res = await fetch(`${base()}/paginas-web/mi/contacto/plantilla`, {
+    const res = await fetch(`${BACKEND_API_ROOT}/paginas-web/mi/contacto/plantilla`, {
       method: 'PUT',
       headers: authHeaders(),
       body: JSON.stringify({ plantilla }),
@@ -133,7 +132,7 @@ export const paginasWebApi = {
   },
 
   async marcarReservaContactada(ventaId: string) {
-    const res = await fetch(`${base()}/paginas-web/mi/reservas/${ventaId}/contactar`, {
+    const res = await fetch(`${BACKEND_API_ROOT}/paginas-web/mi/reservas/${ventaId}/contactar`, {
       method: 'POST',
       headers: authHeaders(),
     })
@@ -141,7 +140,7 @@ export const paginasWebApi = {
   },
 
   async setVentaActiva(activa: boolean) {
-    const res = await fetch(`${base()}/paginas-web/mi/venta-activa`, {
+    const res = await fetch(`${BACKEND_API_ROOT}/paginas-web/mi/venta-activa`, {
       method: 'PATCH',
       headers: authHeaders(),
       body: JSON.stringify({ activa }),
