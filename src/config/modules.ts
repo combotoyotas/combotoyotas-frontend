@@ -185,17 +185,16 @@ export type SessionUser = {
   pagina_web_habilitada?: boolean
 }
 
+/** Acceso operativo al módulo (habilitado por super admin). */
+export function isVendedorPaginaWebActiva(user?: SessionUser | null): boolean {
+  return Boolean(user?.pagina_web_habilitada)
+}
+
 export function getVisibleModules(
   role: UserRole | null,
-  user?: SessionUser | null
+  _user?: SessionUser | null
 ): AppModule[] {
-  return APP_MODULES.filter((module) => {
-    if (!canAccessModule(role, module)) return false
-    if (module.id === 'mi-pagina-web' && role === 'VENDEDOR') {
-      return Boolean(user?.pagina_web_habilitada)
-    }
-    return true
-  })
+  return APP_MODULES.filter((module) => canAccessModule(role, module))
 }
 
 export function isModuleActive(pathname: string, module: AppModule): boolean {

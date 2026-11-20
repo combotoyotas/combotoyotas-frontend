@@ -36,8 +36,8 @@ export default function DashboardPage() {
   const canUsePreasignaciones = ['SUPER_ADMIN', 'ADMIN', 'VENDEDOR'].includes(normalizedRole || '')
   const canUseInventario = normalizedRole === 'SUPER_ADMIN'
   const canUseAjustes = normalizedRole === 'SUPER_ADMIN' || normalizedRole === 'VENDEDOR'
-  const canUsePaginaWeb =
-    normalizedRole === 'VENDEDOR' && Boolean(user?.pagina_web_habilitada)
+  const showPaginaWebEnInicio = normalizedRole === 'VENDEDOR'
+  const paginaWebActiva = Boolean(user?.pagina_web_habilitada)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -282,28 +282,47 @@ export default function DashboardPage() {
               </a>
             )}
 
-            {/* Página web — solo vendedor habilitado por super admin */}
-            {canUsePaginaWeb && (
-              <a
-                href="/mi-pagina-web"
-                className="group relative bg-gradient-to-br from-cyan-500 to-teal-700 p-6 rounded-2xl text-white overflow-hidden card-hover shadow-lg shadow-cyan-600/15"
-              >
-                <div className="relative z-10">
-                  <div className="w-11 h-11 bg-white/15 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 mb-4">
+            {/* Página web — visible para todos los vendedores; acceso solo si está habilitada */}
+            {showPaginaWebEnInicio && (
+              paginaWebActiva ? (
+                <a
+                  href="/mi-pagina-web"
+                  className="group relative bg-gradient-to-br from-cyan-500 to-teal-700 p-6 rounded-2xl text-white overflow-hidden card-hover shadow-lg shadow-cyan-600/15"
+                >
+                  <div className="relative z-10">
+                    <div className="w-11 h-11 bg-white/15 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 mb-4">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                      </svg>
+                    </div>
+                    <h4 className="text-lg font-semibold mb-1">Página web</h4>
+                    <p className="text-cyan-100 text-sm leading-relaxed">
+                      Reservas de tu enlace {user.pagina_web_slug ? `/${user.pagina_web_slug}` : ''}
+                    </p>
+                    <div className="mt-4 flex items-center text-cyan-200 text-xs font-medium group-hover:text-white transition-colors">
+                      Ir al módulo
+                      <svg className="w-3.5 h-3.5 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                    </div>
+                  </div>
+                </a>
+              ) : (
+                <div
+                  className="relative rounded-2xl border border-dashed border-slate-300 bg-slate-100 p-6 text-slate-500 shadow-inner"
+                  title="El super administrador debe habilitar tu página en Páginas web"
+                >
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-slate-200 text-slate-400 mb-4">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                     </svg>
                   </div>
-                  <h4 className="text-lg font-semibold mb-1">Página web</h4>
-                  <p className="text-cyan-100 text-sm leading-relaxed">
-                    Reservas de tu enlace {user.pagina_web_slug ? `/${user.pagina_web_slug}` : ''}
+                  <h4 className="text-lg font-semibold text-slate-600 mb-1">Página web</h4>
+                  <p className="text-sm leading-relaxed text-slate-500">
+                    No habilitada. Pide al super administrador que active tu enlace en{' '}
+                    <span className="font-medium text-slate-600">Páginas web</span>.
                   </p>
-                  <div className="mt-4 flex items-center text-cyan-200 text-xs font-medium group-hover:text-white transition-colors">
-                    Ir al módulo
-                    <svg className="w-3.5 h-3.5 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-                  </div>
+                  <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400">Sin acceso</p>
                 </div>
-              </a>
+              )
             )}
 
             {/* Ajustes — medios de pago y líneas de venta */}

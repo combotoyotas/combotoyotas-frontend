@@ -30,6 +30,7 @@ import {
   UserRole,
   getVisibleModules,
   isModuleActive,
+  isVendedorPaginaWebActiva,
   normalizeRole,
 } from '@/config/modules'
 import { clearModuleLastPaths } from '@/lib/moduleLastPath'
@@ -78,18 +79,38 @@ function NavItem({
   pathname,
   onNavigate,
   userRol,
+  user,
 }: {
   module: AppModule
   pathname: string
   onNavigate?: () => void
   userRol?: string | null
+  user: AppSidebarProps['user']
 }) {
   const active = isModuleActive(pathname, module)
   const Icon = MODULE_ICONS[module.id] ?? FileText
+  const paginaInactiva =
+    module.id === 'mi-pagina-web' && !isVendedorPaginaWebActiva(user)
   const href =
     module.id === 'ventas'
       ? resolveVentasEntryHref()
       : resolveModuleNavHref(module.id, module.href, userRol)
+
+  if (paginaInactiva) {
+    return (
+      <span
+        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium min-h-[44px] cursor-not-allowed border border-dashed border-slate-200 bg-slate-50 text-slate-400"
+        title="Tu página no está habilitada. El super administrador debe activarla en Páginas web."
+        aria-disabled
+      >
+        <Icon className="h-4 w-4 shrink-0 opacity-60" />
+        <span className="truncate">{module.label}</span>
+        <span className="ml-auto shrink-0 rounded-md bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+          No habilitado
+        </span>
+      </span>
+    )
+  }
 
   return (
     <Link
@@ -177,6 +198,7 @@ function SidebarContent({
             pathname={pathname}
             onNavigate={onNavigate}
             userRol={user?.rol}
+            user={user}
           />
         ))}
       </nav>
