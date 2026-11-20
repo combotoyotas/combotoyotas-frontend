@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import VentasOnlineBanner from '@/components/ventasPublicas/VentasOnlineBanner'
 import { resolveVentasEntryHref } from '@/lib/ventasNavigation'
 import { BRAND_SHORT } from '@/config/brand'
+import { SESSION_USER_UPDATED } from '@/config/api'
 import { syncVendedorPaginaSession } from '@/lib/syncVendedorPaginaSession'
 import { TokenManager } from '@/utils/auth'
 
@@ -40,6 +41,7 @@ export default function DashboardPage() {
   const paginaWebActiva = Boolean(user?.pagina_web_habilitada)
 
   useEffect(() => {
+  const load = async () => {
     const token = localStorage.getItem('token')
     const userData = localStorage.getItem('user')
 
@@ -50,16 +52,34 @@ export default function DashboardPage() {
 
     try {
       const parsedUser = JSON.parse(userData) as User
-      setUser(parsedUser)
-
       if (String(parsedUser.rol).toUpperCase() === 'VENDEDOR') {
-        void syncVendedorPaginaSession().then((merged) => {
-          if (merged) setUser({ ...parsedUser, ...merged })
-        })
+        const merged = await syncVendedorPaginaSession()
+        setUser(merged ? { ...parsedUser, ...merged } : parsedUser)
+      } else {
+        setUser(parsedUser)
       }
-    } catch (error) {
+    } catch {
       router.push('/login')
     }
+  }
+
+  void load()
+
+  const onSession = () => {
+    const fresh = TokenManager.getUser() as User | null
+    if (fresh) setUser(fresh)
+  }
+  window.addEventListener(SESSION_USER_UPDATED, onSession)
+  const onFocus = () => {
+    void syncVendedorPaginaSession().then((merged) => {
+      if (merged) setUser(merged as User)
+    })
+  }
+  window.addEventListener('focus', onFocus)
+  return () => {
+    window.removeEventListener(SESSION_USER_UPDATED, onSession)
+    window.removeEventListener('focus', onFocus)
+  }
   }, [router])
 
   const handleLogout = () => {
