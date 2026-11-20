@@ -66,6 +66,46 @@ export function bonoAbonoLinesGapPx(lineCount: number): number {
   return 1
 }
 
+/** Normaliza abonos de API (fecha / created_at) para el pie del bono. */
+export function mapAbonosApiParaBono(
+  raw?: Array<{
+    monto: number
+    fecha?: string
+    created_at?: string
+    estado?: string | null
+  }> | null
+): AbonoBonoLine[] {
+  if (!raw?.length) return []
+  return raw
+    .map((a) => ({
+      monto: Number(a.monto) || 0,
+      fecha: String(a.fecha ?? a.created_at ?? new Date().toISOString()),
+      estado: a.estado ?? 'CONFIRMADO',
+    }))
+    .filter((a) => a.monto > 0)
+}
+
+/** Si no hay líneas de abono, usa totalAbonado para mostrar al menos el abono actual. */
+export function coalesceAbonosParaBono(opts: {
+  abonos?: AbonoBonoLine[] | null
+  totalAbonado?: number | null
+  fechaFallback?: string
+}): AbonoBonoLine[] | null {
+  const activos = getAbonosActivosOrdenados(opts.abonos)
+  if (activos.length) return activos
+  const total = Number(opts.totalAbonado ?? 0)
+  if (total > 0) {
+    return [
+      {
+        monto: total,
+        fecha: opts.fechaFallback || new Date().toISOString(),
+        estado: 'CONFIRMADO',
+      },
+    ]
+  }
+  return null
+}
+
 export function resolveBonoFooterDetalle(opts: {
   bonoCancelado: boolean
   esAbonada: boolean

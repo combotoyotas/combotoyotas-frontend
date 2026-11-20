@@ -20,6 +20,28 @@ import { TokenManager } from '@/utils/auth'
 import VentasMobileActionBar, { type VentasMobileAction } from '@/components/ventas/VentasMobileActionBar'
 import VentasCenteredOverlay from '@/components/ventas/VentasCenteredOverlay'
 import { buildClienteInfoForTicket } from '@/lib/boletaClienteInfo'
+import {
+  mapAbonosApiParaBono,
+  type AbonoBonoLine,
+} from '@/utils/boletaBonoFooter'
+
+function abonosParaBoletaEnTicket(
+  boleta: { id: string; abonos?: AbonoBonoLine[] },
+  tipoVenta: 'COMPLETA' | 'ABONO' | 'RESERVA' | null,
+  abonosPorBoleta: Record<string, number>,
+  ventaResponse: { created_at?: string; updated_at?: string } | null
+): AbonoBonoLine[] | undefined {
+  const desdeApi = mapAbonosApiParaBono(boleta.abonos as Parameters<typeof mapAbonosApiParaBono>[0])
+  if (desdeApi.length) return desdeApi
+  if (tipoVenta !== 'ABONO') return undefined
+  const monto = abonosPorBoleta[boleta.id] ?? 0
+  if (monto <= 0) return undefined
+  const fecha =
+    ventaResponse?.created_at ||
+    ventaResponse?.updated_at ||
+    new Date().toISOString()
+  return [{ monto, fecha, estado: 'CONFIRMADO' }]
+}
 
 const MEDIOS_PAGO_MAP: Record<string, string> = {
   'd397d917-c0d0-4c61-b2b3-2ebfab7deeb7': 'Efectivo',
@@ -581,6 +603,21 @@ export default function CarritoVentas({
                     tipoVenta === 'RESERVA' ? ventaResponse?.bloqueo_hasta : undefined
                   }
                   precio={precioBoleta}
+                  abonos={abonosParaBoletaEnTicket(
+                    b,
+                    tipoVenta,
+                    abonosPorBoleta,
+                    ventaResponse
+                  )}
+                  totalAbonado={
+                    tipoVenta === 'ABONO'
+                      ? (abonosPorBoleta[b.id] ??
+                          (b as { total_pagado_boleta?: number }).total_pagado_boleta ??
+                          0)
+                      : tipoVenta === 'COMPLETA'
+                        ? precioBoleta
+                        : undefined
+                  }
                 />
               </ResponsiveBoletaWrapper>
                 </div>

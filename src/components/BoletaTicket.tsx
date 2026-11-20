@@ -19,6 +19,7 @@ import {
   bonoAbonoLinesGapPx,
   formatMontoBono,
   getAbonosActivosOrdenados,
+  coalesceAbonosParaBono,
   resolveBonoFooterDetalle,
 } from '@/utils/boletaBonoFooter'
 
@@ -142,10 +143,15 @@ export default function BoletaTicket(props: BoletaTicketProps) {
         !esAbonada &&
         !esCancelada))
 
+  const abonosParaBono = coalesceAbonosParaBono({
+    abonos,
+    totalAbonado: totalAbonadoNum,
+  })
+
   const bonoDetalle = resolveBonoFooterDetalle({
     bonoCancelado,
     esAbonada,
-    abonos,
+    abonos: abonosParaBono,
   })
 
   type BarVariant = 'cancelada' | 'bloqueada' | 'reservada' | 'pagada' | 'abonada' | 'disponible'
