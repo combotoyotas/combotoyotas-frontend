@@ -18,6 +18,7 @@ interface StoredUser {
   email: string
   nombre: string
   rol: string
+  pagina_web_habilitada?: boolean
 }
 
 export default function ModuleShell({ children }: { children: React.ReactNode }) {
@@ -46,7 +47,7 @@ export default function ModuleShell({ children }: { children: React.ReactNode })
   }, [pathname])
 
   const role = normalizeRole(user?.rol)
-  const activeModule = getActiveModule(pathname, role)
+  const activeModule = getActiveModule(pathname, role, user)
   const cuadriculaFullscreen = pathname.startsWith('/boletas/cuadricula')
 
   if (!showSidebar && !showTabBar) {

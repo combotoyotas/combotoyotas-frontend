@@ -144,7 +144,12 @@ export default function ClienteSearch({
         if (tipoBusqueda === 'CEDULA' && cedulaBusqueda.length >= 7)  {
           // Búsqueda específica por cédula
           response = await ventasApi.buscarClientePorCedula(cedulaBusqueda.trim())
-          setResultados([response.data])
+          const lista = Array.isArray(response.data)
+            ? response.data
+            : response.data
+              ? [response.data]
+              : []
+          setResultados(lista)
         } else if (tipoBusqueda === 'GENERAL' && busqueda.length >= 3) {
           // Búsqueda general
          const response = await ventasApi.buscarClientes(busqueda)
@@ -239,21 +244,6 @@ export default function ClienteSearch({
       
     } catch (error: any) {
       console.error('Error creando cliente:', error)
-      if (idTrim && (error.code === 'DUPLICATE_IDENTIFICATION' || /cédula/i.test(error.message || ''))) {
-        try {
-          const found = await ventasApi.buscarClientePorCedula(idTrim)
-          const existente = found.data as Cliente
-          if (existente?.id) {
-            onClienteSelected(existente)
-            setClienteCreadoExitosamente(true)
-            setClienteNuevo({ nombre: '', telefono: '', email: '', direccion: '', identificacion: '' })
-            setError(null)
-            return
-          }
-        } catch {
-          /* seguir con mensaje de error */
-        }
-      }
       setError(error.message || 'Error creando cliente')
     } finally {
       setCreando(false)
@@ -587,6 +577,11 @@ export default function ClienteSearch({
                   >
                     <div className="min-w-0">
                       <div className="font-semibold text-slate-900 truncate">{cliente.nombre}</div>
+                      {cliente.codigo && (
+                        <span className="text-xs text-slate-500 block">
+                          Ficha #{cliente.codigo}
+                        </span>
+                      )}
                       <div className="text-sm text-slate-600 flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
                         <span className="inline-flex items-center gap-1">
                           <Phone className="w-3.5 h-3.5" />

@@ -95,6 +95,20 @@ export const APP_MODULES: AppModule[] = [
     roles: ['SUPER_ADMIN'],
   },
   {
+    id: 'paginas-web',
+    label: 'Páginas web',
+    href: '/paginas-web',
+    matchPrefixes: ['/paginas-web'],
+    roles: ['SUPER_ADMIN'],
+  },
+  {
+    id: 'mi-pagina-web',
+    label: 'Página web',
+    href: '/mi-pagina-web',
+    matchPrefixes: ['/mi-pagina-web', '/mi-pagina-web/ajustes'],
+    roles: ['VENDEDOR'],
+  },
+  {
     id: 'trueques',
     label: 'Trueques',
     href: '/trueques',
@@ -166,8 +180,22 @@ export function canAccessModule(role: UserRole | null, module: AppModule): boole
   return module.roles.includes(role)
 }
 
-export function getVisibleModules(role: UserRole | null): AppModule[] {
-  return APP_MODULES.filter((module) => canAccessModule(role, module))
+export type SessionUser = {
+  rol?: string | null
+  pagina_web_habilitada?: boolean
+}
+
+export function getVisibleModules(
+  role: UserRole | null,
+  user?: SessionUser | null
+): AppModule[] {
+  return APP_MODULES.filter((module) => {
+    if (!canAccessModule(role, module)) return false
+    if (module.id === 'mi-pagina-web' && role === 'VENDEDOR') {
+      return Boolean(user?.pagina_web_habilitada)
+    }
+    return true
+  })
 }
 
 export function isModuleActive(pathname: string, module: AppModule): boolean {
@@ -176,8 +204,12 @@ export function isModuleActive(pathname: string, module: AppModule): boolean {
   )
 }
 
-export function getActiveModule(pathname: string, role: UserRole | null): AppModule | null {
-  const visible = getVisibleModules(role)
+export function getActiveModule(
+  pathname: string,
+  role: UserRole | null,
+  user?: SessionUser | null
+): AppModule | null {
+  const visible = getVisibleModules(role, user)
   return visible.find((module) => isModuleActive(pathname, module)) ?? null
 }
 

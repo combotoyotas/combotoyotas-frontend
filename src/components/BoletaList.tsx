@@ -18,6 +18,8 @@ import { downloadBoletaFromElement } from '@/utils/downloadBoletaImage'
 import {
   BOLETA_BADGE_STYLES,
   BOLETA_BODY_TEXT,
+  BOLETA_CLIENTE_CIUDAD_STYLE,
+  BOLETA_CLIENTE_NOMBRE_STYLE,
   BOLETA_BONO_HTML,
   BOLETA_LEFT_STYLE,
   BOLETA_NUMERO_STYLE,
@@ -581,7 +583,7 @@ export default function BoletaList({
         const ciudadCliente =
           (boleta.cliente_info?.direccion ?? '').trim() || '—'
         const bloqueCliente = () =>
-          `<div style="${BOLETA_BODY_TEXT}"><p style="margin:0">A nombre de:</p><p style="margin:0;font-weight:700;font-size:10px">${boleta.cliente_info?.nombre ?? '—'}</p><p style="margin:0;font-size:10px;font-weight:400">${ciudadCliente}</p></div>`
+          `<div style="${BOLETA_BODY_TEXT}"><p style="margin:0">A nombre de:</p><p style="${BOLETA_CLIENTE_NOMBRE_STYLE}">${boleta.cliente_info?.nombre ?? '—'}</p><p style="${BOLETA_CLIENTE_CIUDAD_STYLE}">${ciudadCliente}</p></div>`
 
         if (esCancelada) {
           estadoHTML = `<div style="${BOLETA_BADGE_STYLES.cancelada}">BOLETA CANCELADA</div><p style="${BOLETA_BODY_TEXT};font-weight:700;">Esta boleta no tiene validez</p>`

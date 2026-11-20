@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/config/api'
+import { TokenManager } from '@/utils/auth'
 
 const BASE = `${API_BASE_URL}/api/intercambios`
 
@@ -82,7 +83,20 @@ class IntercambiosApi {
 
   private handle = async <T,>(res: Response): Promise<T> => {
     const data = await res.json()
-    if (!res.ok) throw new Error(data.message || `Error ${res.status}`)
+    if (!res.ok) {
+      const msg = String(data?.message || '').toLowerCase()
+      if (
+        res.status === 401 ||
+        (res.status === 403 &&
+          (msg.includes('inactive') ||
+            msg.includes('token') ||
+            msg.includes('session') ||
+            data?.error === 'Forbidden'))
+      ) {
+        TokenManager.handleAuthError()
+      }
+      throw new Error(data.message || `Error ${res.status}`)
+    }
     return data.data as T
   }
 

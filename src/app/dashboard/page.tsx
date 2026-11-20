@@ -5,12 +5,16 @@ import { useRouter } from 'next/navigation'
 import VentasOnlineBanner from '@/components/ventasPublicas/VentasOnlineBanner'
 import { resolveVentasEntryHref } from '@/lib/ventasNavigation'
 import { BRAND_SHORT } from '@/config/brand'
+import { paginasWebApi } from '@/lib/paginasWebApi'
+import { TokenManager } from '@/utils/auth'
 
 interface User {
   id: string
   email: string
   nombre: string
   rol: string
+  pagina_web_habilitada?: boolean
+  pagina_web_slug?: string | null
 }
 
 export default function DashboardPage() {
@@ -32,6 +36,8 @@ export default function DashboardPage() {
   const canUsePreasignaciones = ['SUPER_ADMIN', 'ADMIN', 'VENDEDOR'].includes(normalizedRole || '')
   const canUseInventario = normalizedRole === 'SUPER_ADMIN'
   const canUseAjustes = normalizedRole === 'SUPER_ADMIN' || normalizedRole === 'VENDEDOR'
+  const canUsePaginaWeb =
+    normalizedRole === 'VENDEDOR' && Boolean(user?.pagina_web_habilitada)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -43,8 +49,21 @@ export default function DashboardPage() {
     }
 
     try {
-      const parsedUser = JSON.parse(userData)
+      const parsedUser = JSON.parse(userData) as User
       setUser(parsedUser)
+
+      if (String(parsedUser.rol).toUpperCase() === 'VENDEDOR') {
+        void paginasWebApi.miPagina().then((res) => {
+          if (!res?.success || !res.data) return
+          const merged: User = {
+            ...parsedUser,
+            pagina_web_habilitada: Boolean(res.data.habilitada),
+            pagina_web_slug: res.data.slug ?? null,
+          }
+          TokenManager.saveAuthData(token, merged)
+          setUser(merged)
+        })
+      }
     } catch (error) {
       router.push('/login')
     }
@@ -263,6 +282,30 @@ export default function DashboardPage() {
                   <h4 className="text-lg font-semibold mb-1">Boletas Reservadas</h4>
                   <p className="text-amber-100 text-sm leading-relaxed">Administrar y liberar boletas reservadas</p>
                   <div className="mt-4 flex items-center text-amber-200 text-xs font-medium group-hover:text-white transition-colors">
+                    Ir al módulo
+                    <svg className="w-3.5 h-3.5 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                  </div>
+                </div>
+              </a>
+            )}
+
+            {/* Página web — solo vendedor habilitado por super admin */}
+            {canUsePaginaWeb && (
+              <a
+                href="/mi-pagina-web"
+                className="group relative bg-gradient-to-br from-cyan-500 to-teal-700 p-6 rounded-2xl text-white overflow-hidden card-hover shadow-lg shadow-cyan-600/15"
+              >
+                <div className="relative z-10">
+                  <div className="w-11 h-11 bg-white/15 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 mb-4">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                    </svg>
+                  </div>
+                  <h4 className="text-lg font-semibold mb-1">Página web</h4>
+                  <p className="text-cyan-100 text-sm leading-relaxed">
+                    Reservas de tu enlace {user.pagina_web_slug ? `/${user.pagina_web_slug}` : ''}
+                  </p>
+                  <div className="mt-4 flex items-center text-cyan-200 text-xs font-medium group-hover:text-white transition-colors">
                     Ir al módulo
                     <svg className="w-3.5 h-3.5 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
                   </div>

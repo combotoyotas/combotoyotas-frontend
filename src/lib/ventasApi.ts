@@ -278,9 +278,7 @@ class VentasApiService {
   }
 
   async buscarClientePorCedula(cedula: string) {
-    return this.request<Cliente>(
-      `/clientes/cedula/${cedula}`
-    )
+    return this.request<Cliente[]>(`/clientes/cedula/${encodeURIComponent(cedula)}`)
   }
 
   async crearCliente(cliente: Cliente) {

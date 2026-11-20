@@ -8,6 +8,13 @@ export const BOLETA_LEFT_STYLE =
 export const BOLETA_BODY_TEXT =
   'font-size:9px;color:#111;line-height:1.35;text-align:center;width:100%;'
 
+/** Nombre y ciudad en el panel izquierdo (legibilidad en impresión). */
+export const BOLETA_CLIENTE_NOMBRE_FONT_PX = 16
+export const BOLETA_CLIENTE_CIUDAD_FONT_PX = 14
+
+export const BOLETA_CLIENTE_NOMBRE_STYLE = `margin:0;font-weight:700;font-size:${BOLETA_CLIENTE_NOMBRE_FONT_PX}px;line-height:1.25;color:#111;`
+export const BOLETA_CLIENTE_CIUDAD_STYLE = `margin:0;font-weight:600;font-size:${BOLETA_CLIENTE_CIUDAD_FONT_PX}px;line-height:1.3;color:#111;`
+
 export const BOLETA_RULES_HTML = `
   <div style="font-size:9px;line-height:1.35;width:100%;margin-bottom:6px;text-align:center;">
     <p style="margin:0">- Boleta sin pagar no juega</p>

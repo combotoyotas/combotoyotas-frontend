@@ -51,6 +51,8 @@ const MODULE_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   historial: History,
   vendedores: UserCog,
   'inventario-vendedores': Package,
+  'paginas-web': Globe,
+  'mi-pagina-web': Globe,
   trueques: ArrowLeftRight,
   intercambios: ArrowLeftRight,
   clientes: Users,
@@ -122,7 +124,7 @@ function SidebarContent({
   onLogout: () => void
 }) {
   const role = normalizeRole(user?.rol)
-  const modules = getVisibleModules(role)
+  const modules = getVisibleModules(role, user)
 
   const roleLabel: Record<UserRole, string> = {
     SUPER_ADMIN: 'Super Administrador',
