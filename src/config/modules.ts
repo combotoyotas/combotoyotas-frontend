@@ -113,7 +113,7 @@ export const APP_MODULES: AppModule[] = [
     label: 'Trueques',
     href: '/trueques',
     matchPrefixes: ['/trueques'],
-    roles: ['SUPER_ADMIN', 'ADMIN'],
+    roles: ['SUPER_ADMIN'],
   },
   {
     id: 'clientes',
