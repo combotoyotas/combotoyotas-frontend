@@ -228,7 +228,8 @@ export default function TruequesPage() {
       return
     }
     const u = JSON.parse(raw)
-    if (String(u.rol || '').toUpperCase() !== 'SUPER_ADMIN') {
+    const rol = String(u.rol || '').toUpperCase()
+    if (rol !== 'SUPER_ADMIN' && rol !== 'ADMIN') {
       router.push('/dashboard')
       return
     }

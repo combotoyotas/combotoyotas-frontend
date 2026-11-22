@@ -20,7 +20,8 @@ export interface ConsultaNumeroIntercambio {
 
 export interface IntercambioCuota {
   aceptados: number
-  limite: number
+  limite: number | null
+  sin_limite?: boolean
   cuota_desde: string
   parte: 'vendedor' | 'oficina'
   puede_solicitar: boolean

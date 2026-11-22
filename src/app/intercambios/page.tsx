@@ -341,7 +341,8 @@ export default function IntercambiosPage() {
     }
   }, [numPedido, rifaId])
 
-  const cupoDisponible = ctx?.cuota_intercambios?.puede_solicitar !== false
+  const cupoDisponible =
+    esOficina || ctx?.cuota_intercambios?.puede_solicitar !== false
 
   const puedeEnviar =
     puedeCrearSolicitud &&
@@ -494,7 +495,17 @@ export default function IntercambiosPage() {
         </p>
       )}
 
-      {ctx?.cuota_intercambios && (esVendedor || esOficina) && (
+      {esOficina && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-950">
+          <p className="font-semibold">Oficina (pool libre)</p>
+          <p className="text-xs mt-1 text-emerald-900/90">
+            Los administradores no tienen límite para enviar ni gestionar intercambios con el pool
+            de oficina. Los vendedores siguen con su cupo individual.
+          </p>
+        </div>
+      )}
+
+      {ctx?.cuota_intercambios && esVendedor && (
         <div
           className={`rounded-xl border px-4 py-3 text-sm ${
             ctx.cuota_intercambios.puede_solicitar
@@ -509,9 +520,8 @@ export default function IntercambiosPage() {
             </span>
           </p>
           <p className="text-xs mt-1 text-slate-600">
-            El límite aplica solo al <strong>enviar</strong> solicitudes (
-            {esOficina ? 'cuota compartida de oficina' : 'tu cupo como solicitante'}) desde la
-            activación del tope. <strong>Recibir y aceptar</strong> no consume cupo.
+            El límite aplica solo al <strong>enviar</strong> solicitudes (tu cupo como solicitante)
+            desde la activación del tope. <strong>Recibir y aceptar</strong> no consume cupo.
           </p>
           {!ctx.cuota_intercambios.puede_solicitar && (
             <p className="text-xs mt-2 font-medium text-amber-900">
