@@ -73,6 +73,13 @@ export const paginasWebApi = {
     return parseAuthJson(res)
   },
 
+  async misReservasSinRevisar() {
+    const res = await fetch(`${BACKEND_API_ROOT}/paginas-web/mi/reservas/sin-revisar`, {
+      headers: authHeaders(),
+    })
+    return parseAuthJson(res)
+  },
+
   async getContactoPagina() {
     const res = await fetch(`${BACKEND_API_ROOT}/paginas-web/mi/contacto`, { headers: authHeaders() })
     return parseAuthJson(res)
