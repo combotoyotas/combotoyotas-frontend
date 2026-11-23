@@ -3,6 +3,7 @@ import {
   type AbonoBonoLine,
   bonoAbonoLineFontPx,
   bonoAbonoLinesGapPx,
+  coalesceAbonosParaBono,
   formatMontoBono,
   resolveBonoFooterDetalle,
 } from '@/utils/boletaBonoFooter'
@@ -64,12 +65,18 @@ export function BOLETA_BONO_FOOTER_HTML(
   bonoCancelado: boolean,
   ticketHeight: number = 334,
   esAbonada = false,
-  abonos?: AbonoBonoLine[] | null
+  abonos?: AbonoBonoLine[] | null,
+  totalAbonado?: number | null
 ): string {
   const f = fontScalePx(ticketHeight)
   const bandBonoPx = bonoFooterHeightPx(ticketHeight)
   const numeroInner = formatNumeroBonoCaja(numeroPrincipal, gift, ticketHeight)
-  const detalle = resolveBonoFooterDetalle({ bonoCancelado, esAbonada, abonos })
+  const abonosCoalesced = coalesceAbonosParaBono({ abonos, totalAbonado })
+  const detalle = resolveBonoFooterDetalle({
+    bonoCancelado,
+    esAbonada,
+    abonos: abonosCoalesced,
+  })
   const detalleHtml = bonoDetalleHtml(detalle, bandBonoPx)
 
   const bonoBoxAligned = `${BONO_BOX(ticketHeight)}justify-content:flex-start;align-items:flex-start;padding:0.38em 0.55em 0.3em 0.62em;font-size:${f.emBono}px;`

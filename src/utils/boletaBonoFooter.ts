@@ -106,6 +106,47 @@ export function coalesceAbonosParaBono(opts: {
   return null
 }
 
+/** Flags compartidos entre BoletaTicket y descarga masiva (HTML). */
+export function computeBonoTicketFlags(opts: {
+  estado: string
+  tieneCliente: boolean
+  deudaNum: number | null
+}) {
+  const estadoNorm = (opts.estado ?? '').toString().trim().toUpperCase()
+  const esReservada = estadoNorm === 'RESERVADA'
+  const esCancelada = estadoNorm === 'ANULADA' || estadoNorm === 'CANCELADA'
+  const estadoPagadoWords = new Set(['CON_PAGO', 'PAGADA', 'PAGADO', 'VENDIDA'])
+  const deudaNum = opts.deudaNum
+  const tieneCliente = opts.tieneCliente
+
+  const esAbonada =
+    estadoNorm === 'ABONADA' ||
+    (tieneCliente &&
+      typeof deudaNum === 'number' &&
+      deudaNum > 0 &&
+      !estadoPagadoWords.has(estadoNorm))
+
+  const esPagada =
+    tieneCliente &&
+    (estadoPagadoWords.has(estadoNorm) ||
+      (typeof deudaNum === 'number' &&
+        deudaNum <= 0 &&
+        !esReservada &&
+        estadoNorm !== 'ABONADA' &&
+        !esCancelada))
+
+  const bonoCancelado =
+    tieneCliente &&
+    (estadoPagadoWords.has(estadoNorm) ||
+      (typeof deudaNum === 'number' &&
+        deudaNum <= 0 &&
+        !esReservada &&
+        estadoNorm !== 'ABONADA' &&
+        !esCancelada))
+
+  return { estadoNorm, esReservada, esCancelada, esPagada, esAbonada, bonoCancelado }
+}
+
 export function resolveBonoFooterDetalle(opts: {
   bonoCancelado: boolean
   esAbonada: boolean

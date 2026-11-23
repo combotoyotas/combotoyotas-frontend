@@ -131,12 +131,18 @@ export default function CarritoVentas({
 
   const clienteInfoBoleta = useMemo(
     () =>
-      buildClienteInfoForTicket(cliente, ventaResponse?.cliente, {
-        nombre: ventaResponse?.cliente_nombre ?? cliente?.nombre,
-        cliente_direccion:
-          ventaResponse?.cliente_direccion ?? ventaResponse?.cliente?.direccion,
-        direccion: cliente?.direccion,
-      }),
+      buildClienteInfoForTicket(
+        ventaResponse?.cliente,
+        {
+          nombre: ventaResponse?.cliente_nombre ?? cliente?.nombre,
+          cliente_direccion:
+            ventaResponse?.cliente_direccion ?? ventaResponse?.cliente?.direccion,
+          direccion: ventaResponse?.cliente?.direccion ?? cliente?.direccion,
+          identificacion:
+            ventaResponse?.cliente?.identificacion ?? cliente?.identificacion,
+        },
+        cliente
+      ),
     [cliente, ventaResponse]
   )
 

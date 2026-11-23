@@ -35,6 +35,8 @@ import {
   boletaHeightForImage,
 } from '@/constants/boletaDimensions'
 import { formatBoletaNumeros, normalizeNumeros, getPrincipalGift, sanitizeBoletaSearchDigits } from '@/utils/formatBoletaNumeros'
+import { buildClienteInfoForTicket } from '@/lib/boletaClienteInfo'
+import { computeBonoTicketFlags, mapAbonosApiParaBono } from '@/utils/boletaBonoFooter'
 import { boletaEstaBloqueadaSinCliente, getBoletaEstadoMenuInfo } from '@/utils/boletaEstadoMenu'
 import { ventasPublicasApi } from '@/lib/ventasPublicasApi'
 import BoletaOpcionesMenu from '@/components/boletas/BoletaOpcionesMenu'
@@ -565,23 +567,24 @@ export default function BoletaList({
           } catch { return boleta.bloqueo_hasta }
         })() : null
 
-        const esReservada = estadoNorm === 'RESERVADA'
-        const esCancelada = estadoNorm === 'ANULADA' || estadoNorm === 'CANCELADA'
-        const pagadoWords = ['CON_PAGO', 'PAGADA', 'PAGADO', 'VENDIDA']
-        const esPagada = pagadoWords.includes(estadoNorm) && tieneCliente
         const fin = financieroMap[boleta.id]
         const saldoFin = fin ? fin.saldo_pendiente : null
-        const esAbonada =
-          estadoNorm === 'ABONADA' ||
-          (tieneCliente && typeof saldoFin === 'number' && saldoFin > 0 && !esPagada)
-        const bonoCancelado =
-          tieneCliente &&
-          (pagadoWords.includes(estadoNorm) ||
-            (typeof saldoFin === 'number' && saldoFin <= 0 && !esReservada && !esAbonada && !esCancelada))
+        const deudaBono =
+          typeof saldoFin === 'number'
+            ? saldoFin
+            : precioNum && estadoNorm === 'ABONADA'
+              ? precioNum
+              : null
+        const { esReservada, esCancelada, esPagada, esAbonada, bonoCancelado } =
+          computeBonoTicketFlags({
+            estado: estadoNorm,
+            tieneCliente,
+            deudaNum: deudaBono,
+          })
 
         let estadoHTML = ''
-        const ciudadCliente =
-          (boleta.cliente_info?.direccion ?? '').trim() || '—'
+        const ciudadTicket = buildClienteInfoForTicket(boleta.cliente_info)
+        const ciudadCliente = (ciudadTicket?.direccion ?? '').trim() || '—'
         const bloqueCliente = () =>
           `<div style="${BOLETA_BODY_TEXT}"><p style="margin:0">A nombre de:</p><p style="${BOLETA_CLIENTE_NOMBRE_STYLE}">${boleta.cliente_info?.nombre ?? '—'}</p><p style="${BOLETA_CLIENTE_CIUDAD_STYLE}">${ciudadCliente}</p></div>`
 
@@ -647,7 +650,15 @@ export default function BoletaList({
             </div>
             <div style="flex-shrink:0;position:relative;overflow:hidden;height:${ticketHeight}px;width:${BOLETA_RIGHT_WIDTH}px;">
               ${rightContent}
-              ${BOLETA_BONO_HTML(principal ?? boleta.numero, gift, bonoCancelado, ticketHeight, esAbonada, abonosMap[boleta.id])}
+              ${BOLETA_BONO_HTML(
+                principal ?? boleta.numero,
+                gift,
+                bonoCancelado,
+                ticketHeight,
+                esAbonada,
+                mapAbonosApiParaBono(abonosMap[boleta.id]),
+                fin?.total_pagado
+              )}
             </div>
           </div>
         `

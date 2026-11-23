@@ -209,6 +209,7 @@ export default function VentasBoletasPage() {
                       precio={boleta.precio_boleta}
                       nota={boleta.nota}
                       abonos={boleta.abonos}
+                      totalAbonado={boleta.total_pagado_boleta}
                     />
                 </ResponsiveBoletaWrapper>
               </div>

@@ -656,6 +656,7 @@ export default function RegistrarAbono({ ventaId, onBack, onAbonoRegistrado }: P
                       precio={b.precio_boleta ?? null}
                       nota={b.nota}
                       abonos={b.abonos}
+                      totalAbonado={b.total_pagado_boleta}
                     />
                   </ResponsiveBoletaWrapper>
                 </div>

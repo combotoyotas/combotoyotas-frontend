@@ -20,6 +20,7 @@ import {
   formatMontoBono,
   getAbonosActivosOrdenados,
   coalesceAbonosParaBono,
+  computeBonoTicketFlags,
   resolveBonoFooterDetalle,
 } from '@/utils/boletaBonoFooter'
 
@@ -122,26 +123,15 @@ export default function BoletaTicket(props: BoletaTicketProps) {
     return null
   })()
 
-  const esReservada = estadoNorm === 'RESERVADA'
-  const esCancelada = estadoNorm === 'ANULADA' || estadoNorm === 'CANCELADA'
-  const estadoPagadoWords = new Set(['CON_PAGO', 'PAGADA', 'PAGADO', 'VENDIDA'])
-  const esPagada =
-    (estadoPagadoWords.has(estadoNorm) || (tieneCliente && deudaNum === 0)) && tieneCliente
-  const esAbonada =
-    estadoNorm === 'ABONADA' || (tieneCliente && typeof deudaNum === 'number' && deudaNum > 0)
+  const { esReservada, esCancelada, esPagada, esAbonada, bonoCancelado } =
+    computeBonoTicketFlags({
+      estado: estadoNorm,
+      tieneCliente,
+      deudaNum,
+    })
 
   const { principal, gift } = getPrincipalGift(numeros, numero, numeroPrincipal)
   const numDisplay = principal ?? numero
-
-  const bonoCancelado =
-    tieneCliente &&
-    (esPagada ||
-      estadoPagadoWords.has(estadoNorm) ||
-      (typeof deudaNum === 'number' &&
-        deudaNum <= 0 &&
-        !esReservada &&
-        !esAbonada &&
-        !esCancelada))
 
   const abonosParaBono = coalesceAbonosParaBono({
     abonos,

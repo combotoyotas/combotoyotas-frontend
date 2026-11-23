@@ -250,9 +250,21 @@ export default function ClienteSearch({
     }
   }
 
-  // Seleccionar cliente existente
-  const seleccionarCliente = (cliente: Cliente) => {
-    onClienteSelected(cliente)
+  // Seleccionar cliente existente (hidrata ciudad desde BD si la búsqueda no la trae)
+  const seleccionarCliente = async (cliente: Cliente) => {
+    let elegido = cliente
+    if (cliente.id && !String(cliente.direccion ?? '').trim()) {
+      try {
+        const response = await ventasApi.getClienteById(cliente.id)
+        const full = response?.data
+        if (full) {
+          elegido = { ...cliente, ...full }
+        }
+      } catch {
+        /* mantener datos parciales */
+      }
+    }
+    onClienteSelected(elegido)
     setBusqueda('')
     setCedulaBusqueda('')
     setResultados([])
@@ -382,7 +394,7 @@ export default function ClienteSearch({
 
                 <button
                   type="button"
-                  onClick={() => usarClienteSimilar(cliente)}
+                  onClick={() => void usarClienteSimilar(cliente)}
                   className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                 >
                   Usar este cliente
@@ -572,7 +584,7 @@ export default function ClienteSearch({
                   <button
                     key={cliente.id}
                     type="button"
-                    onClick={() => seleccionarCliente(cliente)}
+                    onClick={() => void seleccionarCliente(cliente)}
                     className="w-full text-left p-4 hover:bg-blue-50 active:bg-blue-100 transition-colors flex items-center justify-between gap-3 min-h-[64px]"
                   >
                     <div className="min-w-0">
