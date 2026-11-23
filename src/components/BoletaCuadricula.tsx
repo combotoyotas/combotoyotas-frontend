@@ -134,24 +134,24 @@ export default function BoletaCuadricula({
           {dataRows < MAX_SHEET_ROWS ? ` · ${dataRows} núm.` : ''}
         </span>
         {sheets.length > 1 ? (
-          <span className="shrink-0 flex items-center gap-0.5">
+          <span className="shrink-0 flex items-center gap-0.5 max-sm:gap-1">
             <button
               type="button"
               disabled={safeSheetIndex <= 0}
               onClick={() => setSheetIndex((i) => Math.max(0, i - 1))}
-              className="px-1 disabled:opacity-30"
+              className="inline-flex items-center justify-center rounded-lg text-slate-700 disabled:opacity-30 sm:px-1 sm:py-0 sm:text-sm max-sm:min-h-11 max-sm:min-w-11 max-sm:text-xl max-sm:font-semibold max-sm:active:bg-slate-200/70"
               aria-label="Hoja anterior"
             >
               ←
             </button>
-            <span className="font-mono text-slate-700">
+            <span className="font-mono text-slate-700 max-sm:text-xs sm:text-inherit tabular-nums px-0.5">
               Hoja {safeSheetIndex + 1}/{sheets.length}
             </span>
             <button
               type="button"
               disabled={safeSheetIndex >= sheets.length - 1}
               onClick={() => setSheetIndex((i) => Math.min(sheets.length - 1, i + 1))}
-              className="px-1 disabled:opacity-30"
+              className="inline-flex items-center justify-center rounded-lg text-slate-700 disabled:opacity-30 sm:px-1 sm:py-0 sm:text-sm max-sm:min-h-11 max-sm:min-w-11 max-sm:text-xl max-sm:font-semibold max-sm:active:bg-slate-200/70"
               aria-label="Hoja siguiente"
             >
               →

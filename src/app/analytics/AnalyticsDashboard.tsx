@@ -5,6 +5,7 @@ import { getReporteRifa, getResumenVendedoresRifa } from "./services/analytics.s
 import FiltersBar from "./components/FiltersBar";
 import KPISection from "./components/KPISection";
 import MethodsChart from "./components/MethodsChart";
+import LineasVentaReport from "./components/LineasVentaReport";
 import TicketsChart from "./components/TicketsChart";
 
 type Rifa = {
@@ -64,6 +65,10 @@ export default function AnalyticsDashboard({ rifas, scope = 'global', title, esS
     }
     return {};
   })();
+
+  const mostrarLineasVenta =
+    scope === 'mis-ventas' ||
+    Boolean(extraFilters.vendedorId && personFilter.tipo === 'VENDEDOR');
 
   useEffect(() => {
     if (!selectedRifa) return;
@@ -257,6 +262,13 @@ export default function AnalyticsDashboard({ rifas, scope = 'global', title, esS
               extraFilters={extraFilters}
               showCanalDesglose={esSuperAdmin && scope === 'global' && personFilter.tipo === 'TODOS'}
             />
+            {mostrarLineasVenta && (
+              <LineasVentaReport
+                lineas={data.lineas_venta ?? []}
+                fechaInicio={fechaInicio}
+                fechaFin={fechaFin}
+              />
+            )}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6 min-w-0">
               <div className="min-w-0 overflow-hidden">
                 <MethodsChart
