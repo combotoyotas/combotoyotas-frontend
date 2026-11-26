@@ -1,5 +1,4 @@
 import { BACKEND_API_ROOT } from '@/config/api'
-import { TokenManager } from '@/utils/auth'
 
 export type InformesBoletasPseOficinaParams = {
   desde?: string
@@ -47,15 +46,33 @@ export type InformesBoletasPseOficinaResponse = {
   message?: string
 }
 
-function authHeaders(): HeadersInit {
-  const token = TokenManager.getToken()
-  return {
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+function resolveServiceToken(explicit?: string): string {
+  if (explicit) return explicit
+  if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_INFORMES_PSE_OFICINA_TOKEN) {
+    return process.env.NEXT_PUBLIC_INFORMES_PSE_OFICINA_TOKEN
   }
+  return ''
+}
+
+function authHeaders(serviceToken?: string): HeadersInit {
+  const token = resolveServiceToken(serviceToken)
+  if (!token) {
+    throw new Error(
+      'Falta token de informes. Pase serviceToken o configure NEXT_PUBLIC_INFORMES_PSE_OFICINA_TOKEN.'
+    )
+  }
+  return { Authorization: `Bearer ${token}` }
 }
 
 export const informesBoletasPseOficinaApi = {
-  async diarias(params?: InformesBoletasPseOficinaParams): Promise<InformesBoletasPseOficinaResponse> {
+  /**
+   * @param params rango y detalle
+   * @param serviceToken mismo valor que INFORMES_PSE_OFICINA_TOKEN en Railway (solo servidor / integración)
+   */
+  async diarias(
+    params?: InformesBoletasPseOficinaParams,
+    serviceToken?: string
+  ): Promise<InformesBoletasPseOficinaResponse> {
     const q = new URLSearchParams()
     if (params?.desde) q.set('desde', params.desde)
     if (params?.hasta) q.set('hasta', params.hasta)
@@ -63,14 +80,12 @@ export const informesBoletasPseOficinaApi = {
     const qs = q.toString()
     const res = await fetch(
       `${BACKEND_API_ROOT}/informes/boletas-pse-oficina/diarias${qs ? `?${qs}` : ''}`,
-      { headers: authHeaders() }
+      { headers: authHeaders(serviceToken) }
     )
     const data = (await res.json()) as InformesBoletasPseOficinaResponse
-    if (!res.ok) {
-      if (res.status === 401 || res.status === 403) TokenManager.handleAuthError()
+    if (!res.ok || !data.success) {
       throw new Error(data.message || 'Error al cargar informe PSE oficina')
     }
-    if (!data.success) throw new Error(data.message || 'Error al cargar informe PSE oficina')
     return data
   },
 }
